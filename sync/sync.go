@@ -3,7 +3,6 @@ package sync
 import (
 	"context"
 	"errors"
-	"runtime"
 	"time"
 
 	"github.com/NethermindEth/juno/blockchain"
@@ -130,10 +129,14 @@ func (s *Synchronizer) fetchUnknownClasses(ctx context.Context, stateUpdate *cor
 	return newClasses, db.CloseAndWrapOnError(closer, nil)
 }
 
+var lastStore time.Time
+
 func (s *Synchronizer) verifierTask(ctx context.Context, block *core.Block, stateUpdate *core.StateUpdate,
 	newClasses map[felt.Felt]core.Class, resetStreams context.CancelFunc,
 ) stream.Callback {
+	start := time.Now()
 	err := s.Blockchain.SanityCheckNewHeight(block, stateUpdate, newClasses)
+	verifyTook := time.Since(start)
 	return func() {
 		select {
 		case <-ctx.Done():
@@ -144,7 +147,10 @@ func (s *Synchronizer) verifierTask(ctx context.Context, block *core.Block, stat
 				resetStreams()
 				return
 			}
+			start = time.Now()
 			err = s.Blockchain.Store(block, stateUpdate, newClasses)
+			storeTook := time.Since(start)
+			storedAt := time.Now()
 			if err != nil {
 				if errors.Is(err, blockchain.ErrParentDoesNotMatchHead) {
 					// revert the head and restart the sync process, hoping that the reorg is not deep
@@ -170,6 +176,8 @@ func (s *Synchronizer) verifierTask(ctx context.Context, block *core.Block, stat
 
 			s.log.Infow("Stored Block", "number", block.Number, "hash",
 				block.Hash.ShortString(), "root", block.GlobalStateRoot.ShortString())
+			s.log.Debugw("Timings", "verify", verifyTook, "store", storeTook, "blockTime", storedAt.Sub(lastStore))
+			lastStore = storedAt
 		}
 	}
 }
@@ -188,8 +196,8 @@ func (s *Synchronizer) syncBlocks(syncCtx context.Context) {
 		s.HighestBlockHeader = nil
 	}()
 
-	fetchers := stream.New().WithMaxGoroutines(runtime.NumCPU())
-	verifiers := stream.New().WithMaxGoroutines(runtime.NumCPU())
+	fetchers := stream.New().WithMaxGoroutines(2)
+	verifiers := stream.New().WithMaxGoroutines(2)
 
 	streamCtx, streamCancel := context.WithCancel(syncCtx)
 
