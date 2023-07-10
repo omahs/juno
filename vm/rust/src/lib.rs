@@ -18,9 +18,18 @@ use blockifier::{
     },
     state::cached_state::CachedState,
     transaction::{
-        objects::AccountTransactionContext, transaction_execution::Transaction,
-        transactions::ExecutableTransaction,
+        objects::{
+            AccountTransactionContext, TransactionExecutionInfo,
+        }, transaction_execution::Transaction,
+        transactions::{
+            ExecutableTransaction, Executable,
+        },
+        transaction_utils::{
+            calculate_tx_resources, calculate_l1_gas_usage,
+        },
+        transaction_types::TransactionType,
     },
+    fee::fee_utils::calculate_tx_fee,
 };
 use cairo_lang_starknet::casm_contract_class::CasmContractClass;
 use cairo_lang_starknet::contract_class::ContractClass as SierraContractClass;
@@ -34,10 +43,11 @@ use starknet_api::{
     block::{BlockNumber, BlockTimestamp},
     deprecated_contract_class::EntryPointType,
     hash::StarkFelt,
+    transaction::TransactionSignature,
 };
 use starknet_api::{
     core::PatriciaKey,
-    transaction::{Calldata, Transaction as StarknetApiTransaction},
+    transaction::{Calldata, Transaction as StarknetApiTransaction, Fee},
 };
 use starknet_api::{
     core::{ChainId, ContractAddress, EntryPointSelector},
@@ -120,6 +130,7 @@ pub extern "C" fn cairoVMExecute(
     block_timestamp: c_ulonglong,
     chain_id: *const c_char,
     sequencer_address: *const c_uchar,
+    paid_fee_on_l1_str: *const c_char,
 ) {
     let reader = JunoStateReader::new(reader_handle);
     let chain_id_str = unsafe { CStr::from_ptr(chain_id) }.to_str().unwrap();
@@ -177,7 +188,24 @@ pub extern "C" fn cairoVMExecute(
             _ => None,
         };
 
-        let txn = Transaction::from_api(sn_api_txn.clone(), contract_class, None);
+        let paid_fee_on_l1: Option<Fee> = match sn_api_txn.clone() {
+            StarknetApiTransaction::L1Handler(_) => {
+                let paid_fee_on_l1_str = unsafe { CStr::from_ptr(paid_fee_on_l1_str) }.to_str().unwrap();
+                let paid_fee_on_l1 = match u128::from_str_radix(paid_fee_on_l1_str, 16) {
+                    Ok(i) => Fee(i),
+                    Err(e) => {
+                        report_error(reader_handle, format!("failed to convert string to u128 reason:{:?}", e).as_str());
+                        return;
+                    }
+                }
+                ;
+                Some(paid_fee_on_l1)
+            },
+            _ => None,
+        };
+
+
+        let txn = Transaction::from_api(sn_api_txn.clone(), contract_class, paid_fee_on_l1);
         if txn.is_err() {
             report_error(reader_handle, txn.unwrap_err().to_string().as_str());
             return;
@@ -185,7 +213,64 @@ pub extern "C" fn cairoVMExecute(
 
         let res = match txn.unwrap() {
             Transaction::AccountTransaction(t) => t.execute(&mut state, &block_context),
-            Transaction::L1HandlerTransaction(t) => t.execute(&mut state, &block_context),
+            Transaction::L1HandlerTransaction(t) => {
+                // Manually inline L1HandlerTransaction.execute and execute_raw since the
+                // `actual_fee` in Blockifier is zero (i.e., Blockifier doesn't charge for L1
+                // Handler transactions on L2). This way we can get the full
+                // TransactionExecutionResult.
+                let mut transactional_state = CachedState::create_transactional(&mut state);
+                // Inlined L1HandlerTransaction.execute_raw
+                let execution_result = || -> Result<TransactionExecutionInfo, _> {
+                    let tx = &t.tx;
+                    let tx_context = AccountTransactionContext {
+                        transaction_hash: tx.transaction_hash,
+                        max_fee: Fee::default(),
+                        version: tx.version,
+                        signature: TransactionSignature::default(),
+                        nonce: tx.nonce,
+                        sender_address: tx.contract_address,
+                    };
+                    let mut resources = ExecutionResources::default();
+                    let mut context = EntryPointExecutionContext::new_invoke(&block_context, &tx_context);
+                    let mut remaining_gas = Transaction::initial_gas();
+                    let execute_call_info =
+                        t.run_execute(&mut transactional_state, &mut resources, &mut context, &mut remaining_gas)?;
+
+                    let call_infos =
+                        if let Some(call_info) = execute_call_info.as_ref() { vec![call_info] } else { vec![] };
+                    // The calldata includes the "from" field, which is not a part of the payload.
+                    let l1_handler_payload_size = Some(tx.calldata.0.len() - 1);
+                    let l1_gas_usage = calculate_l1_gas_usage(
+                        &call_infos,
+                        &mut transactional_state,
+                        l1_handler_payload_size,
+                        block_context.fee_token_address,
+                        None,
+                    )?;
+                    let actual_resources =
+                        calculate_tx_resources(resources, l1_gas_usage, TransactionType::L1Handler)?;
+                    let actual_fee = calculate_tx_fee(&actual_resources, &context.block_context)?;
+                    Ok(TransactionExecutionInfo {
+                        validate_call_info: None,
+                        execute_call_info,
+                        fee_transfer_call_info: None,
+                        actual_fee,
+                        actual_resources,
+                        revert_error: None,
+                    })
+                }();
+
+                match execution_result {
+                    Ok(value) => {
+                        transactional_state.commit();
+                        Ok(value)
+                    }
+                    Err(error) => {
+                        transactional_state.abort();
+                        Err(error)
+                    }
+                }
+            },
         };
 
         match res {

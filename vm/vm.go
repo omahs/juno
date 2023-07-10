@@ -8,7 +8,7 @@ package vm
 //					char* chain_id);
 //
 // extern void cairoVMExecute(char* txns_json, char* classes_json, uintptr_t readerHandle, unsigned long long block_number,
-//					unsigned long long block_timestamp, char* chain_id, char* sequencer_address);
+//					unsigned long long block_timestamp, char* chain_id, char* sequencer_address, char* paid_fee_on_l1);
 //
 // #cgo LDFLAGS: -L./rust/target/release -ljuno_starknet_rs -lm -ldl
 import "C"
@@ -117,7 +117,7 @@ func Call(contractAddr, selector *felt.Felt, calldata []felt.Felt, blockNumber,
 
 // Execute executes a given transaction set and returns the gas spent per transaction
 func Execute(txns []core.Transaction, declaredClasses []core.Class, blockNumber, blockTimestamp uint64,
-	sequencerAddress *felt.Felt, state core.StateReader, network utils.Network,
+	sequencerAddress *felt.Felt, state core.StateReader, network utils.Network, paidFeeOnL1 *felt.Felt,
 ) ([]*felt.Felt, error) {
 	context := &callContext{
 		state: state,
@@ -130,6 +130,7 @@ func Execute(txns []core.Transaction, declaredClasses []core.Class, blockNumber,
 		return nil, err
 	}
 
+	paidFeeOnL1CStr := C.CString(paidFeeOnL1.Text(felt.Base16))
 	txnsJSONCstr := C.CString(string(txnsJSON))
 	classesJSONCStr := C.CString(string(classesJSON))
 
@@ -141,9 +142,11 @@ func Execute(txns []core.Transaction, declaredClasses []core.Class, blockNumber,
 		C.ulonglong(blockNumber),
 		C.ulonglong(blockTimestamp),
 		chainID,
-		(*C.char)(unsafe.Pointer(&sequencerAddressBytes[0])))
+		(*C.char)(unsafe.Pointer(&sequencerAddressBytes[0])),
+		paidFeeOnL1CStr)
 
 	C.free(unsafe.Pointer(classesJSONCStr))
+	C.free(unsafe.Pointer(paidFeeOnL1CStr))
 	C.free(unsafe.Pointer(txnsJSONCstr))
 	C.free(unsafe.Pointer(chainID))
 
