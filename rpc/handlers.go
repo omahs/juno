@@ -1217,6 +1217,10 @@ func (h *Handler) TraceBlockTransactions(blockHash felt.Felt) ([]TracedBlockTran
 	return h.traceBlockTransactions(block, len(block.Transactions))
 }
 
+func (h *Handler) Testing(v string) (string, *jsonrpc.Error) {
+	return v, nil
+}
+
 func (h *Handler) traceBlockTransactions(block *core.Block, numTxns int) ([]TracedBlockTransaction, *jsonrpc.Error) {
 	isPending := block.Hash == nil
 

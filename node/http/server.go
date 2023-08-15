@@ -245,5 +245,10 @@ func methods(h *rpc.Handler) []jsonrpc.Method { //nolint: funlen
 			Params:  []jsonrpc.Parameter{{Name: "block_hash"}},
 			Handler: h.TraceBlockTransactions,
 		},
+		{
+			Name:    "kirill_testing",
+			Params:  []jsonrpc.Parameter{{Name: "v", Optional: true}},
+			Handler: h.Testing,
+		},
 	}
 }

@@ -391,7 +391,7 @@ func (s *Server) buildArguments(ctx context.Context, params any, method Method) 
 		paramsList := params.([]any)
 
 		if len(paramsList) == 0 && allParamsAreOptional {
-			return s.buildDefaultArguments(ctx, method)
+			// return s.buildDefaultArguments(ctx, method)
 		}
 
 		if len(paramsList) != numArgs-addContext {
@@ -407,10 +407,6 @@ func (s *Server) buildArguments(ctx context.Context, params any, method Method) 
 		}
 	case reflect.Map:
 		paramsMap := params.(map[string]any)
-
-		if len(paramsMap) == 0 && allParamsAreOptional {
-			return s.buildDefaultArguments(ctx, method)
-		}
 
 		for i, configuredParam := range method.Params {
 			var v reflect.Value
