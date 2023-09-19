@@ -175,7 +175,8 @@ func New(cfg *Config, version string) (*Node, error) { //nolint:gocyclo,funlen
 	if cfg.Metrics {
 		chain.WithListener(makeBlockchainMetrics())
 		makeJunoMetrics(version)
-		database.WithListener(makeDBMetrics())
+		meterInterval := 5 * time.Second
+		database.WithListener(makeDBMetrics()).Meter(meterInterval)
 		rpcMetrics, legacyRPCMetrics := makeRPCMetrics(path, legacyPath)
 		jsonrpcServer.WithListener(rpcMetrics)
 		jsonrpcServerLegacy.WithListener(legacyRPCMetrics)

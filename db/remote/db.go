@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"math"
+	"time"
 
 	"github.com/NethermindEth/juno/db"
 	"github.com/NethermindEth/juno/grpc/gen"
@@ -53,6 +54,10 @@ func (d *DB) Update(fn func(txn db.Transaction) error) error {
 
 func (d *DB) WithListener(listener db.EventListener) db.DB {
 	return d
+}
+
+func (d *DB) Meter(_ time.Duration) {
+	panic("cannot call Meter on remote db")
 }
 
 func (d *DB) Close() error {
