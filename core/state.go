@@ -353,29 +353,21 @@ func (s *State) Class(classHash *felt.Felt) (*DeclaredClass, error) {
 	return &class, nil
 }
 
-func (s *State) updateStorageBuffered(contractAddr *felt.Felt, updateDiff []StorageDiff, blockNumber uint64, logChanges bool) (
-	*db.BufferedTransaction, error,
-) {
-	// to avoid multiple transactions writing to s.txn, create a buffered transaction and use that in the worker goroutine
-	bufferedTxn := db.NewBufferedTransaction(s.txn)
-	bufferedState := NewState(bufferedTxn)
-	bufferedContract, err := NewContract(contractAddr, bufferedTxn)
+func (s *State) updateStorageSynced(syncTxn *db.SyncTransaction, contractAddr *felt.Felt, updateDiff []StorageDiff, blockNumber uint64, logChanges bool) error {
+	syncContract, err := NewContract(contractAddr, syncTxn)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	syncState := NewState(syncTxn)
 	onValueChanged := func(location, oldValue *felt.Felt) error {
 		if logChanges {
-			return bufferedState.LogContractStorage(contractAddr, location, oldValue, blockNumber)
+			return syncState.LogContractStorage(contractAddr, location, oldValue, blockNumber)
 		}
 		return nil
 	}
 
-	if err = bufferedContract.UpdateStorage(updateDiff, onValueChanged); err != nil {
-		return nil, err
-	}
-
-	return bufferedTxn, nil
+	return syncContract.UpdateStorage(updateDiff, onValueChanged)
 }
 
 // updateContractStorage applies the diff set to the Trie of the
@@ -411,25 +403,18 @@ func (s *State) updateContractStorages(stateTrie *trie.Trie, diffs map[felt.Felt
 	})
 
 	// update per-contract storage Tries concurrently
-	contractUpdaters := pool.NewWithResults[*db.BufferedTransaction]().WithErrors().WithMaxGoroutines(runtime.GOMAXPROCS(0))
+	contractUpdaters := pool.New().WithErrors().WithMaxGoroutines(runtime.GOMAXPROCS(0))
+	syncTxn := db.NewSyncTransaction(s.txn)
 	for _, key := range keys {
 		conractAddr := key
 		updateDiff := diffs[conractAddr]
-		contractUpdaters.Go(func() (*db.BufferedTransaction, error) {
-			return s.updateStorageBuffered(&conractAddr, updateDiff, blockNumber, logChanges)
+		contractUpdaters.Go(func() error {
+			return s.updateStorageSynced(syncTxn, &conractAddr, updateDiff, blockNumber, logChanges)
 		})
 	}
 
-	bufferedTxns, err := contractUpdaters.Wait()
-	if err != nil {
+	if err := contractUpdaters.Wait(); err != nil {
 		return err
-	}
-
-	// flush buffered txns
-	for _, bufferedTxn := range bufferedTxns {
-		if err = bufferedTxn.Flush(); err != nil {
-			return err
-		}
 	}
 
 	for addr := range diffs {
