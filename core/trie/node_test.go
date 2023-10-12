@@ -20,7 +20,7 @@ func TestNodeHash(t *testing.T) {
 	expected := utils.HexToFelt(t, "0x1d937094c09b5f8e26a662d21911871e3cbc6858d55cc49af9848ea6fed4e9")
 
 	node := trie.Node{
-		Value: new(felt.Felt).SetBytes(valueBytes),
+		Value: *new(felt.Felt).SetBytes(valueBytes),
 	}
 	path := trie.NewKey(6, []byte{42})
 

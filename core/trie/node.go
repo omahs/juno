@@ -9,32 +9,28 @@ import (
 
 // A Node represents a node in the [Trie]
 type Node struct {
-	Value *felt.Felt
+	Value felt.Felt
 	Left  *Key
 	Right *Key
 }
 
 // Hash calculates the hash of a [Node]
-func (n *Node) Hash(path *Key, hashFunc hashFunc) *felt.Felt {
+func (n *Node) Hash(path *Key, hashFunc hashFunc) felt.Felt {
 	if path.Len() == 0 {
 		// we have to deference the Value, since the Node can released back
 		// to the NodePool and be reused anytime
-		hash := *n.Value
-		return &hash
+		return n.Value
 	}
 
 	pathFelt := path.Felt()
 	// https://docs.starknet.io/documentation/develop/State/starknet-state/
-	hash := hashFunc(n.Value, &pathFelt)
+	hash := hashFunc(&n.Value, &pathFelt)
 	pathFelt.SetUint64(uint64(path.Len()))
-	return hash.Add(hash, &pathFelt)
+	hash.Add(hash, &pathFelt)
+	return *hash
 }
 
 func (n *Node) WriteTo(buf *bytes.Buffer) (int64, error) {
-	if n.Value == nil {
-		return 0, errors.New("cannot marshal node with nil value")
-	}
-
 	totalBytes := int64(0)
 
 	valueB := n.Value.Bytes()
@@ -64,9 +60,6 @@ func (n *Node) WriteTo(buf *bytes.Buffer) (int64, error) {
 func (n *Node) UnmarshalBinary(data []byte) error {
 	if len(data) < felt.Bytes {
 		return errors.New("size of input data is less than felt size")
-	}
-	if n.Value == nil {
-		n.Value = new(felt.Felt)
 	}
 	n.Value.SetBytes(data[:felt.Bytes])
 	data = data[felt.Bytes:]

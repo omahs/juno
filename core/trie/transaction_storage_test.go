@@ -21,7 +21,7 @@ func TestTransactionStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	node := &trie.Node{
-		Value: value,
+		Value: *value,
 	}
 
 	t.Run("put a node", func(t *testing.T) {

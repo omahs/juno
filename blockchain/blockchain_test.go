@@ -786,3 +786,31 @@ func TestSubscribeNewHeads(t *testing.T) {
 		assert.Equal(t, block1.Header, got1)
 	})
 }
+
+func BenchmarkMainnetBlock(b *testing.B) {
+	client := feeder.NewClient(utils.MAINNET.FeederURL())
+	gw := adaptfeeder.New(client)
+
+	testDB, err := pebble.New("/home/omer/Documents/juno_mainnet_sync", nil)
+	require.NoError(b, err)
+	b.Cleanup(func() {
+		require.NoError(b, testDB.Close())
+	})
+	chain := blockchain.New(testDB, utils.MAINNET, utils.NewNopZapLogger())
+
+	height, err := chain.Height()
+	require.NoError(b, err)
+
+	block, err := gw.BlockByNumber(context.Background(), height+1)
+	require.NoError(b, err)
+	stateUpdate, err := gw.StateUpdate(context.Background(), height+1)
+	require.NoError(b, err)
+
+	b.Log("block num", block.Number)
+	stateUpdate.NewRoot = &felt.Zero
+	b.N = 10
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		chain.Store(block, &core.BlockCommitments{}, stateUpdate, nil)
+	}
+}

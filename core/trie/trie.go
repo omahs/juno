@@ -177,7 +177,7 @@ func (t *Trie) Get(key *felt.Felt) (*felt.Felt, error) {
 		return nil, err
 	}
 	defer nodePool.Put(value)
-	leafValue := *value.Value
+	leafValue := value.Value
 	return &leafValue, nil
 }
 
@@ -192,13 +192,13 @@ func (t *Trie) Put(key, value *felt.Felt) (*felt.Felt, error) {
 	old := felt.Zero
 	nodeKey := t.feltToKey(key)
 	node := &Node{
-		Value: value,
+		Value: *value,
 	}
 
 	// check if we are updating an existing leaf, if yes avoid traversing the trie
 	if !value.IsZero() {
 		if existingLeaf, err := t.storage.Get(&nodeKey); err == nil {
-			old = *existingLeaf.Value // record old value to return to caller
+			old = existingLeaf.Value // record old value to return to caller
 			if err = t.storage.Put(&nodeKey, node); err != nil {
 				return nil, err
 			}
@@ -237,7 +237,7 @@ func (t *Trie) Put(key, value *felt.Felt) (*felt.Felt, error) {
 		if nodeKey.Equal(sibling.key) {
 			// we have to deference the Value, since the Node can released back
 			// to the NodePool and be reused anytime
-			old = *sibling.node.Value // record old value to return to caller
+			old = sibling.node.Value // record old value to return to caller
 			if err = t.deleteLast(nodes); err != nil {
 				return nil, err
 			}
@@ -261,7 +261,9 @@ func (t *Trie) Put(key, value *felt.Felt) (*felt.Felt, error) {
 		leftPath := path(newParent.Left, &commonKey)
 		rightPath := path(newParent.Right, &commonKey)
 
-		newParent.Value = t.hash(leftChild.Hash(&leftPath, t.hash), rightChild.Hash(&rightPath, t.hash))
+		leftHash := leftChild.Hash(&leftPath, t.hash)
+		rightHash := rightChild.Hash(&rightPath, t.hash)
+		newParent.Value = *t.hash(&leftHash, &rightHash)
 		if err = t.storage.Put(&commonKey, newParent); err != nil {
 			return nil, err
 		}
@@ -335,7 +337,9 @@ func (t *Trie) updateValueIfDirty(key *Key) (*Node, error) {
 	leftPath := path(node.Left, key)
 	rightPath := path(node.Right, key)
 
-	node.Value = t.hash(leftChild.Hash(&leftPath, t.hash), rightChild.Hash(&rightPath, t.hash))
+	leftHash := leftChild.Hash(&leftPath, t.hash)
+	rightHash := rightChild.Hash(&rightPath, t.hash)
+	node.Value = *t.hash(&leftHash, &rightHash)
 
 	if err = t.storage.Put(key, node); err != nil {
 		return nil, err
@@ -407,6 +411,9 @@ func (t *Trie) Root() (*felt.Felt, error) {
 		return new(felt.Felt), nil
 	}
 
+	//	storage := t.storage
+	//	t.storage = storage.SyncedStorage()
+	//	defer func() { t.storage = storage }()
 	root, err := t.updateValueIfDirty(t.rootKey)
 	if err != nil {
 		return nil, err
@@ -415,7 +422,8 @@ func (t *Trie) Root() (*felt.Felt, error) {
 	t.dirtyNodes = nil
 
 	path := path(t.rootKey, nil)
-	return root.Hash(&path, t.hash), nil
+	rootHash := root.Hash(&path, t.hash)
+	return &rootHash, nil
 }
 
 // Commit forces root calculation

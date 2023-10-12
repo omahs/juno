@@ -467,7 +467,7 @@ func migrateTrieNodesFromBitsetToTrieKey(target db.Bucket) BucketMigratorDoFunc 
 		}
 
 		trieNode := trie.Node{
-			Value: n.Value,
+			Value: *n.Value,
 		}
 		if n.Left != nil {
 			trieNode.Left = bitset2Key(n.Left)
