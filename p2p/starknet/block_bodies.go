@@ -146,6 +146,7 @@ func (b *blockBodyIterator) diff() (proto.Message, bool) {
 	}
 
 	for addr, n := range diff.Nonces {
+		addr := addr // copy
 		cDiff, ok := modifiedContracts[addr]
 		if !ok {
 			cDiff, err = initContractDiff(&addr)
@@ -159,6 +160,7 @@ func (b *blockBodyIterator) diff() (proto.Message, bool) {
 	}
 
 	for addr, sDiff := range diff.StorageDiffs {
+		addr := addr // copy
 		cDiff, ok := modifiedContracts[addr]
 		if !ok {
 			cDiff, err = initContractDiff(&addr)

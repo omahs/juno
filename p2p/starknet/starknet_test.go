@@ -1,9 +1,11 @@
 package starknet_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -316,6 +318,14 @@ func TestClientHandler(t *testing.T) {
 
 		var count int
 		for body, valid := res(); valid; body, valid = res() {
+			if count == 0 {
+				diff := body.BodyMessage.(*spec.BlockBodiesResponse_Diff).Diff.ContractDiffs
+				sortContractDiff(diff)
+
+				expectedDiff := expectedMessages[count].BodyMessage.(*spec.BlockBodiesResponse_Diff).Diff.ContractDiffs
+				sortContractDiff(expectedDiff)
+			}
+
 			if !assert.True(t, proto.Equal(expectedMessages[count], body), "iteration %d, type %T", count, body.BodyMessage) {
 				spew.Dump(body.BodyMessage)
 			}
@@ -668,4 +678,12 @@ func fillFelts[T any](t *testing.T, i T) T {
 	}
 
 	return i
+}
+
+func sortContractDiff(diff []*spec.StateDiff_ContractDiff) {
+	sort.Slice(diff, func(i, j int) bool {
+		iAddress := diff[i].Address
+		jAddress := diff[j].Address
+		return bytes.Compare(iAddress.Elements, jAddress.Elements) < 0
+	})
 }
