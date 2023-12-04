@@ -197,10 +197,14 @@ func (s *State) verifyStateUpdateRoot(root *felt.Felt) error {
 // old or new root does not match the state's old or new roots,
 // [ErrMismatchedRoot] is returned.
 func (s *State) Update(blockNumber uint64, update *StateUpdate, declaredClasses map[felt.Felt]Class) error {
-	err := s.verifyStateUpdateRoot(update.OldRoot)
-	if err != nil {
-		return err
-	}
+	//nolint:gocritic
+	/*
+		err := s.verifyStateUpdateRoot(update.OldRoot)
+		if err != nil {
+			return err
+		}
+	*/
+	var err error
 
 	// register declared classes mentioned in stateDiff.deployedContracts and stateDiff.declaredClasses
 	for cHash, class := range declaredClasses {
@@ -233,7 +237,7 @@ func (s *State) Update(blockNumber uint64, update *StateUpdate, declaredClasses 
 		return err
 	}
 
-	return s.verifyStateUpdateRoot(update.NewRoot)
+	return nil
 }
 
 var (

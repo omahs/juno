@@ -21,6 +21,7 @@ import (
 	"github.com/NethermindEth/juno/db"
 	"github.com/NethermindEth/juno/feed"
 	"github.com/NethermindEth/juno/jsonrpc"
+	"github.com/NethermindEth/juno/mempool"
 	"github.com/NethermindEth/juno/starknet"
 	"github.com/NethermindEth/juno/sync"
 	"github.com/NethermindEth/juno/utils"
@@ -80,6 +81,7 @@ type traceCacheKey struct {
 }
 
 type Handler struct {
+	mempool       *mempool.Mempool
 	bcReader      blockchain.Reader
 	syncReader    sync.Reader
 	network       utils.Network
@@ -140,6 +142,11 @@ func (h *Handler) WithFilterLimit(limit uint) *Handler {
 
 func (h *Handler) WithIDGen(idgen func() uint64) *Handler {
 	h.idgen = idgen
+	return h
+}
+
+func (h *Handler) WithMempool(m *mempool.Mempool) *Handler {
+	h.mempool = m
 	return h
 }
 
@@ -1081,66 +1088,18 @@ func setEventFilterRange(filter *blockchain.EventFilter, fromID, toID *BlockID, 
 
 // AddTransaction relays a transaction to the gateway.
 func (h *Handler) AddTransaction(tx BroadcastedTransaction) (*AddTxResponse, *jsonrpc.Error) { //nolint:gocritic
-	if tx.Type == TxnDeclare && tx.Version.Cmp(new(felt.Felt).SetUint64(2)) != -1 {
-		contractClass := make(map[string]any)
-		if err := json.Unmarshal(tx.ContractClass, &contractClass); err != nil {
-			return nil, ErrInternal.CloneWithData(fmt.Sprintf("unmarshal contract class: %v", err))
-		}
-		sierraProg, ok := contractClass["sierra_program"]
-		if !ok {
-			return nil, jsonrpc.Err(jsonrpc.InvalidParams, "{'sierra_program': ['Missing data for required field.']}")
-		}
-
-		sierraProgBytes, errIn := json.Marshal(sierraProg)
-		if errIn != nil {
-			return nil, jsonrpc.Err(jsonrpc.InternalError, errIn.Error())
-		}
-
-		gwSierraProg, errIn := utils.Gzip64Encode(sierraProgBytes)
-		if errIn != nil {
-			return nil, jsonrpc.Err(jsonrpc.InternalError, errIn.Error())
-		}
-
-		contractClass["sierra_program"] = gwSierraProg
-		newContractClass, err := json.Marshal(contractClass)
-		if err != nil {
-			return nil, ErrInternal.CloneWithData(fmt.Sprintf("marshal revised contract class: %v", err))
-		}
-		tx.ContractClass = newContractClass
+	coreTx, class, _, err := adaptBroadcastedTransaction(&tx, h.network)
+	if err != nil {
+		return nil, ErrInternal.CloneWithData(fmt.Errorf("adapt broadcasted transaction: %v", err))
 	}
-
-	txJSON, err := json.Marshal(&struct {
-		*starknet.Transaction
-		ContractClass json.RawMessage `json:"contract_class,omitempty"`
-	}{
-		Transaction:   adaptRPCTxToFeederTx(&tx.Transaction),
-		ContractClass: tx.ContractClass,
+	h.mempool.Enqueue(&mempool.BroadcastedTransaction{
+		Transaction: coreTx,
+		Class:       class,
 	})
-	if err != nil {
-		return nil, ErrInternal.CloneWithData(fmt.Sprintf("marshal transaction: %v", err))
-	}
-	respJSON, err := h.gatewayClient.AddTransaction(txJSON)
-	if err != nil {
-		return nil, makeJSONErrorFromGatewayError(err)
-	}
-
-	var gatewayResponse struct {
-		TransactionHash *felt.Felt `json:"transaction_hash"`
-		ContractAddress *felt.Felt `json:"address"`
-		ClassHash       *felt.Felt `json:"class_hash"`
-	}
-	if err = json.Unmarshal(respJSON, &gatewayResponse); err != nil {
-		return nil, jsonrpc.Err(jsonrpc.InternalError, fmt.Sprintf("unmarshal gateway response: %v", err))
-	}
-
-	return &AddTxResponse{
-		TransactionHash: gatewayResponse.TransactionHash,
-		ContractAddress: gatewayResponse.ContractAddress,
-		ClassHash:       gatewayResponse.ClassHash,
-	}, nil
+	return &AddTxResponse{TransactionHash: coreTx.Hash()}, nil
 }
 
-func makeJSONErrorFromGatewayError(err error) *jsonrpc.Error {
+func makeJSONErrorFromGatewayError(err error) *jsonrpc.Error { //nolint:unused
 	gatewayErr, ok := err.(*gateway.Error)
 	if !ok {
 		return jsonrpc.Err(jsonrpc.InternalError, err.Error())

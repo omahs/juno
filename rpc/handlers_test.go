@@ -2516,6 +2516,7 @@ func TestEvents(t *testing.T) {
 }
 
 func TestAddTransactionUnmarshal(t *testing.T) {
+	t.Skip("we're block building for now, not sending txs to feeder")
 	tests := map[string]string{
 		"deploy account v3": `{
 			"type": "DEPLOY_ACCOUNT",
@@ -2560,6 +2561,7 @@ func TestAddTransactionUnmarshal(t *testing.T) {
 }
 
 func TestAddTransaction(t *testing.T) {
+	t.Skip("we're block building for now, not sending txs to feeder")
 	network := utils.Integration
 	gw := adaptfeeder.New(feeder.NewTestClient(t, network))
 	txWithoutClass := func(hash string) rpc.BroadcastedTransaction {

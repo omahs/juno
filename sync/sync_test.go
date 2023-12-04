@@ -89,6 +89,7 @@ func TestSyncBlocks(t *testing.T) {
 
 	t.Run("sync multiple blocks, with an unreliable gw", func(t *testing.T) {
 		t.Parallel()
+		t.Skip("tests verifying state roots, which we won't do when building")
 		testDB := pebble.NewMemTest(t)
 		bc := blockchain.New(testDB, utils.Mainnet, log)
 
