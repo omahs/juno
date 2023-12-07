@@ -80,11 +80,8 @@ func (m *BucketMigrator) Migrate(ctx context.Context, txn db.Transaction, networ
 	}
 
 	for iterator.Seek(m.startFrom); iterator.Valid(); iterator.Next() {
-		select {
-		case <-ctx.Done():
-			return nil, utils.RunAndWrapOnError(iterator.Close, ctx.Err())
-		default:
-			// keep going
+		if err := ctx.Err(); err != nil {
+			return nil, utils.RunAndWrapOnError(iterator.Close, err)
 		}
 
 		key := iterator.Key()
