@@ -82,7 +82,7 @@ func (m *BucketMigrator) Migrate(ctx context.Context, txn db.Transaction, networ
 	for iterator.Seek(m.startFrom); iterator.Valid(); iterator.Next() {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, utils.RunAndWrapOnError(iterator.Close, ctx.Err())
 		default:
 			// keep going
 		}
