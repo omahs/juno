@@ -715,9 +715,6 @@ func (h *Handler) Syncing() (*Sync, *jsonrpc.Error) {
 	if highestBlockHeader == nil {
 		return defaultSyncState, nil
 	}
-	if highestBlockHeader.Number <= head.Number {
-		return defaultSyncState, nil
-	}
 
 	return &Sync{
 		StartingBlockHash:   startingBlockHeader.Hash,
