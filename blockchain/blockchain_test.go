@@ -899,7 +899,7 @@ func TestCannotRevertGenesisState(t *testing.T) {
 	genesisDiff := core.StateDiff{
 		StorageDiffs: map[felt.Felt]map[felt.Felt]*felt.Felt{
 			*utils.HexToFelt(t, "0x1"): {
-				*utils.HexToFelt(t, "0x0"): utils.HexToFelt(t, "0x1337"),
+				{}: utils.HexToFelt(t, "0x1337"),
 			},
 		},
 	}
@@ -917,8 +917,11 @@ func TestCannotRevertGenesisState(t *testing.T) {
 	require.NoError(t, err)
 	su0, err := gw.StateUpdate(context.Background(), 0)
 	require.NoError(t, err)
+	su0.StateDiff.StorageDiffs[*new(felt.Felt).SetUint64(1)] = map[felt.Felt]*felt.Felt{
+		{}: new(felt.Felt).SetUint64(1),
+	}
 	su0.OldRoot = genesisRoot
-	su0.NewRoot = utils.HexToFelt(t, "0x78bb2f3d68f25219b1629d9c5d5fe9de26249fca369fbeb96d23fec5e806455")
+	su0.NewRoot = utils.HexToFelt(t, "0x1d8228a7b66acc85ef8dca96f0cf5f6f81cc50b92b54f86b612b9348d589410")
 	require.NoError(t, chain.Store(block0, nil, su0, nil))
 
 	// Revert the block.
