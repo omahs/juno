@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/NethermindEth/juno/blockchain"
 	"github.com/NethermindEth/juno/builder"
@@ -30,7 +31,7 @@ func TestValidateAgainstPendingState(t *testing.T) {
 	mockVM := mocks.NewMockVM(mockCtrl)
 	bc := blockchain.New(testDB, utils.Integration, utils.NewNopZapLogger())
 	seqAddr := utils.HexToFelt(t, "0xDEADBEEF")
-	testBuilder := builder.New(nil, seqAddr, bc, mockVM, utils.NewNopZapLogger())
+	testBuilder := builder.New(nil, seqAddr, bc, mockVM, 0, utils.NewNopZapLogger())
 
 	client := feeder.NewTestClient(t, utils.Integration)
 	gw := adaptfeeder.New(client)
@@ -74,7 +75,7 @@ func TestSign(t *testing.T) {
 	seqAddr := utils.HexToFelt(t, "0xDEADBEEF")
 	privKey, err := ecdsa.GenerateKey(rand.Reader)
 	require.NoError(t, err)
-	testBuilder := builder.New(privKey, seqAddr, bc, mockVM, utils.NewNopZapLogger())
+	testBuilder := builder.New(privKey, seqAddr, bc, mockVM, 0, utils.NewNopZapLogger())
 
 	_, err = testBuilder.Sign(new(felt.Felt), new(felt.Felt))
 	require.NoError(t, err)
@@ -201,4 +202,50 @@ func TestReceipt(t *testing.T) {
 	}
 	got := builder.Receipt(want.Fee, want.FeeUnit, want.TransactionHash, trace)
 	require.Equal(t, want, got)
+}
+
+type finisher struct {
+	i   uint64
+	max uint64
+}
+
+func newFinisher(max uint64) *finisher {
+	return &finisher{
+		max: max,
+	}
+}
+
+func (f *finisher) Done() bool {
+	if f.i < f.max {
+		f.i++
+		return false
+	}
+	return true
+}
+
+func TestBuildTwoEmptyBlocks(t *testing.T) {
+	testDB := pebble.NewMemTest(t)
+	mockCtrl := gomock.NewController(t)
+	mockVM := mocks.NewMockVM(mockCtrl)
+	bc := blockchain.New(testDB, utils.Integration, utils.NewNopZapLogger())
+	require.NoError(t, bc.StoreGenesis(core.EmptyStateDiff(), nil))
+	seqAddr := utils.HexToFelt(t, "0xDEADBEEF")
+	privKey, err := ecdsa.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	numBlocks := uint64(2)
+	testBuilder := builder.New(privKey, seqAddr, bc, mockVM, time.Millisecond, utils.NewNopZapLogger()).WithFinaliseCb(newFinisher(numBlocks).Done)
+
+	require.NoError(t, testBuilder.Run(context.Background()))
+
+	height, err := bc.Height()
+	require.NoError(t, err)
+	require.Equal(t, numBlocks+1, height)
+	for i := uint64(1); i < numBlocks+1; i++ {
+		block, err := bc.BlockByNumber(i)
+		require.NoError(t, err)
+		require.Equal(t, seqAddr, block.SequencerAddress)
+		require.Empty(t, block.Transactions)
+		require.Empty(t, block.Receipts)
+	}
 }

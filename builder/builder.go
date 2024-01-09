@@ -3,6 +3,8 @@ package builder
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/NethermindEth/juno/adapters/vm2core"
 	"github.com/NethermindEth/juno/blockchain"
@@ -32,12 +34,21 @@ type Builder struct {
 	vm       vm.VM
 	newHeads *feed.Feed[*core.Header]
 	log      utils.Logger
+
+	// Returns true when the builder should exit. Called after finalising each block.
+	// Useful for tests.
+	finaliseCb func() bool
+	blockTime  time.Duration
 }
 
-func New(privKey *ecdsa.PrivateKey, ownAddr *felt.Felt, bc *blockchain.Blockchain, builderVM vm.VM, log utils.Logger) *Builder {
+func New(privKey *ecdsa.PrivateKey, ownAddr *felt.Felt, bc *blockchain.Blockchain, builderVM vm.VM,
+	blockTime time.Duration, log utils.Logger,
+) *Builder {
 	return &Builder{
 		ownAddress: *ownAddr,
 		privKey:    privKey,
+		blockTime:  blockTime,
+		log:        log,
 
 		bc:       bc,
 		vm:       builderVM,
@@ -45,9 +56,36 @@ func New(privKey *ecdsa.PrivateKey, ownAddr *felt.Felt, bc *blockchain.Blockchai
 	}
 }
 
+// WithFinisher is useful for testing. The function f does not need to be goroutine-safe.
+func (b *Builder) WithFinaliseCb(cb func() bool) *Builder {
+	b.finaliseCb = cb
+	return b
+}
+
+// Run takes ownership of the Builder.
 func (b *Builder) Run(ctx context.Context) error {
-	<-ctx.Done()
-	return nil
+	ticker := time.NewTicker(b.blockTime)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if err := b.bc.Finalise([]core.Transaction{}, []*core.TransactionReceipt{}, core.EmptyStateDiff(), nil,
+				&b.ownAddress, b.Sign); err != nil {
+				return fmt.Errorf("finalise: %v", err)
+			}
+			header, err := b.bc.HeadsHeader()
+			if err != nil {
+				return fmt.Errorf("get header of latest block: %v", err)
+			}
+			b.log.Infow("Finalised block", "number", header.Number, "hash", header.Hash.ShortString())
+
+			if b.finaliseCb != nil && b.finaliseCb() {
+				return nil
+			}
+		}
+	}
 }
 
 // ValidateAgainstPendingState validates a user transaction against the pending state
