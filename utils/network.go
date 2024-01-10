@@ -33,6 +33,17 @@ const (
 	SepoliaIntegration
 )
 
+func AllNetworks() []Network {
+	return []Network{
+		Mainnet,
+		Goerli,
+		Goerli2,
+		Integration,
+		Sepolia,
+		SepoliaIntegration,
+	}
+}
+
 func (n Network) String() string {
 	switch n {
 	case Mainnet:
