@@ -30,8 +30,9 @@ func TestValidateAgainstPendingState(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	mockVM := mocks.NewMockVM(mockCtrl)
 	bc := blockchain.New(testDB, utils.Integration, utils.NewNopZapLogger())
+	mpool := mempool.New(pebble.NewMemTest(t))
 	seqAddr := utils.HexToFelt(t, "0xDEADBEEF")
-	testBuilder := builder.New(nil, seqAddr, bc, mockVM, 0, utils.NewNopZapLogger())
+	testBuilder := builder.New(nil, seqAddr, bc, mockVM, 0, mpool, utils.NewNopZapLogger())
 
 	client := feeder.NewTestClient(t, utils.Integration)
 	gw := adaptfeeder.New(client)
@@ -75,7 +76,8 @@ func TestSign(t *testing.T) {
 	seqAddr := utils.HexToFelt(t, "0xDEADBEEF")
 	privKey, err := ecdsa.GenerateKey(rand.Reader)
 	require.NoError(t, err)
-	testBuilder := builder.New(privKey, seqAddr, bc, mockVM, 0, utils.NewNopZapLogger())
+	mpool := mempool.New(pebble.NewMemTest(t))
+	testBuilder := builder.New(privKey, seqAddr, bc, mockVM, 0, mpool, utils.NewNopZapLogger())
 
 	_, err = testBuilder.Sign(new(felt.Felt), new(felt.Felt))
 	require.NoError(t, err)
@@ -230,11 +232,12 @@ func TestBuildTwoEmptyBlocks(t *testing.T) {
 	bc := blockchain.New(testDB, utils.Integration, utils.NewNopZapLogger())
 	require.NoError(t, bc.StoreGenesis(core.EmptyStateDiff(), nil))
 	seqAddr := utils.HexToFelt(t, "0xDEADBEEF")
+	mpool := mempool.New(pebble.NewMemTest(t))
 	privKey, err := ecdsa.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 
 	numBlocks := uint64(2)
-	testBuilder := builder.New(privKey, seqAddr, bc, mockVM, time.Millisecond, utils.NewNopZapLogger()).WithFinaliseCb(newFinisher(numBlocks).Done)
+	testBuilder := builder.New(privKey, seqAddr, bc, mockVM, time.Millisecond, mpool, utils.NewNopZapLogger()).WithFinaliseCb(newFinisher(numBlocks).Done)
 
 	require.NoError(t, testBuilder.Run(context.Background()))
 

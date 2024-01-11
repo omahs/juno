@@ -34,6 +34,7 @@ type Builder struct {
 	vm       vm.VM
 	newHeads *feed.Feed[*core.Header]
 	log      utils.Logger
+	mempool  *mempool.Pool
 
 	// Returns true when the builder should exit. Called after finalising each block.
 	// Useful for tests.
@@ -42,13 +43,14 @@ type Builder struct {
 }
 
 func New(privKey *ecdsa.PrivateKey, ownAddr *felt.Felt, bc *blockchain.Blockchain, builderVM vm.VM,
-	blockTime time.Duration, log utils.Logger,
+	blockTime time.Duration, mpool *mempool.Pool, log utils.Logger,
 ) *Builder {
 	return &Builder{
 		ownAddress: *ownAddr,
 		privKey:    privKey,
 		blockTime:  blockTime,
 		log:        log,
+		mempool:    mpool,
 
 		bc:       bc,
 		vm:       builderVM,
@@ -66,6 +68,11 @@ func (b *Builder) WithFinaliseCb(cb func() bool) *Builder {
 func (b *Builder) Run(ctx context.Context) error {
 	ticker := time.NewTicker(b.blockTime)
 	defer ticker.Stop()
+
+	if err := b.keepMempoolAndBlockchainConsistent(); err != nil {
+		return fmt.Errorf("keep mempool and blockchain consistent: %v", err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -86,6 +93,35 @@ func (b *Builder) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (b *Builder) keepMempoolAndBlockchainConsistent() error {
+	block, err := b.bc.Head()
+	if err != nil {
+		if errors.Is(err, db.ErrKeyNotFound) {
+			return nil
+		}
+		return fmt.Errorf("get head block: %v", err)
+	}
+
+	for txIsCommited := false; txIsCommited; {
+		tx, err := b.mempool.Peek()
+		if err != nil {
+			return fmt.Errorf("peek in mempool: %v", err)
+		}
+
+		txIsCommited = false
+		for _, otherTx := range block.Transactions {
+			if tx.Transaction.Hash().Equal(otherTx.Hash()) {
+				txIsCommited = true
+				if _, err = b.mempool.Pop(); err != nil {
+					return fmt.Errorf("pop from mempool: %v", err)
+				}
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // ValidateAgainstPendingState validates a user transaction against the pending state

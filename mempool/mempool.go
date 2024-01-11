@@ -50,6 +50,24 @@ func (p *Pool) WithValidator(validator ValidatorFunc) *Pool {
 	return p
 }
 
+func (p *Pool) Peek() (*BroadcastedTransaction, error) {
+	var tx *BroadcastedTransaction
+	return tx, p.db.View(func(txn db.Transaction) error {
+		headHash, err := p.headHash(txn)
+		if err != nil {
+			return err
+		}
+
+		headElem, err := p.elem(txn, headHash)
+		if err != nil {
+			return err
+		}
+
+		tx = &headElem.Txn
+		return nil
+	})
+}
+
 // Push queues a transaction to the pool
 func (p *Pool) Push(userTxn *BroadcastedTransaction) error {
 	err := p.validator(userTxn)

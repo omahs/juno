@@ -41,11 +41,15 @@ func TestMempool(t *testing.T) {
 		assert.Equal(t, i+1, l)
 	}
 
-	// consume some
+	// pop some, peeking along the way
 	for i := uint64(0); i < 2; i++ {
-		txn, err := pool.Pop()
+		txnPeeked, err := pool.Peek()
 		require.NoError(t, err)
-		assert.Equal(t, i, txn.Transaction.Hash().Uint64())
+		require.Equal(t, i, txnPeeked.Transaction.Hash().Uint64())
+
+		txnPopped, err := pool.Pop()
+		require.NoError(t, err)
+		require.Equal(t, *txnPeeked, txnPopped)
 
 		l, err := pool.Len()
 		require.NoError(t, err)
