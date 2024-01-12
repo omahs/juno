@@ -1,0 +1,74 @@
+name: Juno Network Sync Test
+
+on:
+  push:
+    branches:
+      - IronGauntlets/p2p-syncing
+      - wojciechos/p2p_smoke_test
+
+jobs:
+  setup-and-test-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: IronGauntlets/p2p-syncing 
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    # - name: Build Docker Image
+    #   run: |
+    #     docker build -t juno-local-build .
+        
+    - name: Create Docker Network
+      run: docker network create juno_network
+
+    - name: Run Bootnode (juno)
+      run: |
+        docker run -d \
+          --name juno \
+          --network juno_network \
+          -p 6060:6060 \
+          -v $HOME/juno_sepolia:/var/lib/juno \
+          nethermindeth/juno:p2p-syncing \
+          --http-port "6060" \
+          --db-path "/var/lib/juno" \
+          --network sepolia \
+          --eth-node "wss://sepolia.infura.io/ws/v3/a31beacc30844825b0ae92feee435338" \
+          --pending-poll-interval "2s" \
+          --log-level "debug" \
+          --p2p \
+          --p2p-bootnode \
+          --p2p-addr /ip4/0.0.0.0/tcp/7777 \
+          --p2p-private-key "5f6cdc3aebcc74af494df054876100368ef6126e3a33fa65b90c765b381ffc37a0a63bbeeefab0740f24a6a38dabb513b9233254ad0020c721c23e69bc820089"
+    
+    - name: Check bootnode logs
+      run: |
+        sleep 5
+        docker logs juno | head -n 100
+        
+    - name: Get IP of Bootnode
+      id: get-ip
+      run: echo "BOOTNODE_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' juno)" >> $GITHUB_ENV
+
+    - name: Run P2P Node (juno2)
+      run: |
+        docker run -d \
+          --name juno2 \
+          --network juno_network \
+          -p 6070:6070 \
+          -v $HOME/juno2_sepolia:/var/lib/juno2 \
+          nethermindeth/juno:p2p-syncing \
+          --http-port "6070" \
+          --db-path "/var/lib/juno2" \
+          --network "sepolia" \
+          --log-level "debug" \
+          --p2p \
+          --p2p-boot-peers /ip4/${{ env.BOOTNODE_IP }}/tcp/7777/p2p/12D3KooWLdURCjbp1D7hkXWk6ZVfcMDPtsNnPHuxoTcWXFtvrxGG \
+          --http-host "0.0.0.0"
+    
+    - name: Display Logs
+      run: docker logs -f juno2
