@@ -8,7 +8,7 @@ on:
 
 jobs:
   setup-and-test-sync:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - name: Checkout code
@@ -37,7 +37,6 @@ jobs:
           --http-port "6060" \
           --db-path "/var/lib/juno" \
           --network sepolia \
-          --eth-node "wss://sepolia.infura.io/ws/v3/a31beacc30844825b0ae92feee435338" \
           --pending-poll-interval "2s" \
           --log-level "debug" \
           --p2p \
