@@ -3,28 +3,33 @@ name: Juno Network Sync Test
 on:
   push:
     branches:
-      - IronGauntlets/p2p-syncing
+     # - IronGauntlets/p2p-syncing
       - wojciechos/p2p_smoke_test
 
 jobs:
   setup-and-test-sync:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        ref: IronGauntlets/p2p-syncing 
+    # - name: Checkout code
+    #   uses: actions/checkout@v4
+    #   with:
+    #     ref: IronGauntlets/p2p-syncing 
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
     # - name: Build Docker Image
-    #   run: |
-    #     docker build -t juno-local-build .
+      # run: |
+        # docker build -t juno-local-build .
         
-    - name: Create Docker Network
-      run: docker network create juno_network
+    - name: Create Docker Network if Not Exists
+      run: |
+        if ! docker network ls | grep -q juno_network; then
+          docker network create juno_network
+        else
+          echo "Network juno_network already exists."
+        fi
 
     - name: Run Bootnode (juno)
       run: |
@@ -33,7 +38,7 @@ jobs:
           --network juno_network \
           -p 6060:6060 \
           -v $HOME/juno_sepolia:/var/lib/juno \
-          nethermindeth/juno:p2p-syncing \
+          nethermindeth/juno:p2p-syncing-e4b743e \
           --http-port "6060" \
           --db-path "/var/lib/juno" \
           --network sepolia \
@@ -60,7 +65,7 @@ jobs:
           --network juno_network \
           -p 6070:6070 \
           -v $HOME/juno2_sepolia:/var/lib/juno2 \
-          nethermindeth/juno:p2p-syncing \
+          nethermindeth/juno:p2p-syncing-e4b743e \
           --http-port "6070" \
           --db-path "/var/lib/juno2" \
           --network "sepolia" \
