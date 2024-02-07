@@ -74,11 +74,6 @@ const (
 	traceCacheSize     = 128
 )
 
-type traceCacheKey struct {
-	blockHash felt.Felt
-	legacy    bool
-}
-
 type Handler struct {
 	bcReader      blockchain.Reader
 	syncReader    sync.Reader
@@ -94,7 +89,7 @@ type Handler struct {
 	mu            stdsync.Mutex // protects subscriptions.
 	subscriptions map[uint64]*subscription
 
-	blockTraceCache *lru.Cache[traceCacheKey, []TracedBlockTransaction]
+	blockTraceCache *lru.Cache[felt.Felt, []TracedBlockTransaction]
 
 	filterLimit  uint
 	callMaxSteps uint64
@@ -122,7 +117,7 @@ func New(bcReader blockchain.Reader, syncReader sync.Reader, virtualMachine vm.V
 		newHeads:      feed.New[*core.Header](),
 		subscriptions: make(map[uint64]*subscription),
 
-		blockTraceCache: lru.NewCache[traceCacheKey, []TracedBlockTransaction](traceCacheSize),
+		blockTraceCache: lru.NewCache[felt.Felt, []TracedBlockTransaction](traceCacheSize),
 		filterLimit:     math.MaxUint,
 	}
 }
@@ -231,17 +226,6 @@ func (h *Handler) BlockWithTxHashes(id BlockID) (*BlockWithTxHashes, *jsonrpc.Er
 	}, nil
 }
 
-func (h *Handler) LegacyBlockWithTxHashes(id BlockID) (*BlockWithTxHashes, *jsonrpc.Error) {
-	block, rpcErr := h.BlockWithTxHashes(id)
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-
-	block.L1GasPrice.InStark = block.L1GasPrice.InFri
-	block.L1GasPrice.InFri = nil
-	return block, nil
-}
-
 func (h *Handler) l1Head() (*core.L1Head, *jsonrpc.Error) {
 	l1Head, err := h.bcReader.L1Head()
 	if err != nil && !errors.Is(err, db.ErrKeyNotFound) {
@@ -324,22 +308,6 @@ func (h *Handler) BlockWithTxs(id BlockID) (*BlockWithTxs, *jsonrpc.Error) {
 		BlockHeader:  adaptBlockHeader(block.Header),
 		Transactions: txs,
 	}, nil
-}
-
-func (h *Handler) LegacyBlockWithTxs(id BlockID) (*BlockWithTxs, *jsonrpc.Error) {
-	block, rpcErr := h.BlockWithTxs(id)
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-
-	block.L1GasPrice.InStark = block.L1GasPrice.InFri
-	block.L1GasPrice.InFri = nil
-	for _, tx := range block.Transactions {
-		if err := tx.ToPreV3(); err != nil {
-			return nil, jsonrpc.Err(jsonrpc.InternalError, err)
-		}
-	}
-	return block, nil
 }
 
 func AdaptTransaction(t core.Transaction) *Transaction {
@@ -531,17 +499,6 @@ func (h *Handler) TransactionByHash(hash felt.Felt) (*Transaction, *jsonrpc.Erro
 	return AdaptTransaction(txn), nil
 }
 
-func (h *Handler) LegacyTransactionByHash(hash felt.Felt) (*Transaction, *jsonrpc.Error) {
-	txn, rpcErr := h.TransactionByHash(hash)
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-	if err := txn.ToPreV3(); err != nil {
-		return nil, jsonrpc.Err(jsonrpc.InternalError, err)
-	}
-	return txn, nil
-}
-
 // BlockTransactionCount returns the number of transactions in a block
 // identified by the given BlockID.
 //
@@ -589,17 +546,6 @@ func (h *Handler) TransactionByBlockIDAndIndex(id BlockID, txIndex int) (*Transa
 	}
 
 	return AdaptTransaction(txn), nil
-}
-
-func (h *Handler) LegacyTransactionByBlockIDAndIndex(id BlockID, txIndex int) (*Transaction, *jsonrpc.Error) {
-	txn, rpcErr := h.TransactionByBlockIDAndIndex(id, txIndex)
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-	if err := txn.ToPreV3(); err != nil {
-		return nil, jsonrpc.Err(jsonrpc.InternalError, err)
-	}
-	return txn, nil
 }
 
 func feeUnit(txn core.Transaction) FeeUnit {
@@ -696,16 +642,6 @@ func (h *Handler) TransactionReceiptByHash(hash felt.Felt) (*TransactionReceipt,
 		ExecutionResources: adaptExecutionResources(receipt.ExecutionResources),
 		MessageHash:        messageHash,
 	}, nil
-}
-
-func (h *Handler) LegacyTransactionReceiptByHash(hash felt.Felt) (*TransactionReceipt, *jsonrpc.Error) {
-	receipt, rpcErr := h.TransactionReceiptByHash(hash)
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-	receipt.ActualFee.isLegacy = true
-	receipt.ExecutionResources.isLegacy = true
-	return receipt, nil
 }
 
 func adaptExecutionResources(resources *core.ExecutionResources) *ExecutionResources {
@@ -1338,20 +1274,9 @@ func (h *Handler) TransactionStatus(ctx context.Context, hash felt.Felt) (*Trans
 func (h *Handler) EstimateFee(broadcastedTxns []BroadcastedTransaction,
 	simulationFlags []SimulationFlag, id BlockID,
 ) ([]FeeEstimate, *jsonrpc.Error) {
-	result, err := h.simulateTransactions(id, broadcastedTxns, append(simulationFlags, SkipFeeChargeFlag), false, true)
+	result, err := h.simulateTransactions(id, broadcastedTxns, append(simulationFlags, SkipFeeChargeFlag), true)
 	if err != nil {
 		return nil, err
-	}
-
-	return utils.Map(result, func(tx SimulatedTransaction) FeeEstimate {
-		return tx.FeeEstimation
-	}), nil
-}
-
-func (h *Handler) LegacyEstimateFee(broadcastedTxns []BroadcastedTransaction, id BlockID) ([]FeeEstimate, *jsonrpc.Error) {
-	result, err := h.simulateTransactions(id, broadcastedTxns, []SimulationFlag{SkipFeeChargeFlag}, true, true)
-	if err != nil && err.Code == ErrTransactionExecutionError.Code {
-		return nil, makeContractError(errors.New(err.Data.(TransactionExecutionErrorData).ExecutionError))
 	}
 
 	return utils.Map(result, func(tx SimulatedTransaction) FeeEstimate {
@@ -1390,37 +1315,12 @@ func (h *Handler) EstimateMessageFee(msg MsgFromL1, id BlockID) (*FeeEstimate, *
 	return &estimates[0], nil
 }
 
-func (h *Handler) LegacyEstimateMessageFee(msg MsgFromL1, id BlockID) (*FeeEstimate, *jsonrpc.Error) { //nolint:gocritic
-	estimate, rpcErr := h.EstimateMessageFee(msg, id)
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-	estimate.Unit = nil
-	return estimate, nil
-}
-
 // TraceTransaction returns the trace for a given executed transaction, including internal calls
 //
 // It follows the specification defined here:
 // https://github.com/starkware-libs/starknet-specs/blob/1ae810e0137cc5d175ace4554892a4f43052be56/api/starknet_trace_api_openrpc.json#L11
 func (h *Handler) TraceTransaction(ctx context.Context, hash felt.Felt) (*vm.TransactionTrace, *jsonrpc.Error) {
-	return h.traceTransaction(ctx, &hash, false)
-}
-
-// LegacyTraceTransaction returns the trace for a given executed transaction, including internal calls
-//
-// It follows the specification defined here:
-// https://github.com/starkware-libs/starknet-specs/blob/1ae810e0137cc5d175ace4554892a4f43052be56/api/starknet_trace_api_openrpc.json#L11
-func (h *Handler) LegacyTraceTransaction(ctx context.Context, hash felt.Felt) (*vm.TransactionTrace, *jsonrpc.Error) {
-	trace, err := h.traceTransaction(ctx, &hash, true)
-	if err != nil && err.Code == ErrTxnHashNotFound.Code {
-		err = ErrInvalidTxHash
-	}
-	return trace, err
-}
-
-func (h *Handler) traceTransaction(ctx context.Context, hash *felt.Felt, legacyTraceJSON bool) (*vm.TransactionTrace, *jsonrpc.Error) {
-	_, _, blockNumber, err := h.bcReader.Receipt(hash)
+	_, _, blockNumber, err := h.bcReader.Receipt(&hash)
 	if err != nil {
 		return nil, ErrTxnHashNotFound
 	}
@@ -1431,13 +1331,13 @@ func (h *Handler) traceTransaction(ctx context.Context, hash *felt.Felt, legacyT
 	}
 
 	txIndex := slices.IndexFunc(block.Transactions, func(tx core.Transaction) bool {
-		return tx.Hash().Equal(hash)
+		return tx.Hash().Equal(&hash)
 	})
 	if txIndex == -1 {
 		return nil, ErrTxnHashNotFound
 	}
 
-	traceResults, traceBlockErr := h.traceBlockTransactions(ctx, block, legacyTraceJSON)
+	traceResults, traceBlockErr := h.traceBlockTransactions(ctx, block)
 	if traceBlockErr != nil {
 		return nil, traceBlockErr
 	}
@@ -1448,21 +1348,11 @@ func (h *Handler) traceTransaction(ctx context.Context, hash *felt.Felt, legacyT
 func (h *Handler) SimulateTransactions(id BlockID, transactions []BroadcastedTransaction,
 	simulationFlags []SimulationFlag,
 ) ([]SimulatedTransaction, *jsonrpc.Error) {
-	return h.simulateTransactions(id, transactions, simulationFlags, false, false)
-}
-
-func (h *Handler) LegacySimulateTransactions(id BlockID, transactions []BroadcastedTransaction,
-	simulationFlags []SimulationFlag,
-) ([]SimulatedTransaction, *jsonrpc.Error) {
-	res, err := h.simulateTransactions(id, transactions, simulationFlags, true, true)
-	if err != nil && err.Code == ErrTransactionExecutionError.Code {
-		return nil, makeContractError(errors.New(err.Data.(TransactionExecutionErrorData).ExecutionError))
-	}
-	return res, err
+	return h.simulateTransactions(id, transactions, simulationFlags, false)
 }
 
 func (h *Handler) simulateTransactions(id BlockID, transactions []BroadcastedTransaction,
-	simulationFlags []SimulationFlag, legacyTraceJSON, errOnRevert bool,
+	simulationFlags []SimulationFlag, errOnRevert bool,
 ) ([]SimulatedTransaction, *jsonrpc.Error) {
 	skipFeeCharge := slices.Contains(simulationFlags, SkipFeeChargeFlag)
 	skipValidate := slices.Contains(simulationFlags, SkipValidateFlag)
@@ -1504,7 +1394,7 @@ func (h *Handler) simulateTransactions(id BlockID, transactions []BroadcastedTra
 	}
 	overallFees, traces, err := h.vm.Execute(txns, classes, header.Number, header.Timestamp, sequencerAddress,
 		state, h.bcReader.Network(), paidFeesOnL1, skipFeeCharge, skipValidate, errOnRevert, header.GasPrice,
-		header.GasPriceSTRK, legacyTraceJSON)
+		header.GasPriceSTRK)
 	if err != nil {
 		if errors.Is(err, utils.ErrResourceBusy) {
 			return nil, ErrInternal.CloneWithData(err.Error())
@@ -1531,11 +1421,9 @@ func (h *Handler) simulateTransactions(id BlockID, transactions []BroadcastedTra
 			GasConsumed: new(felt.Felt).Div(overallFee, gasPrice),
 			GasPrice:    gasPrice,
 			OverallFee:  overallFee,
+			Unit:        utils.Ptr(feeUnit),
 		}
 
-		if !legacyTraceJSON {
-			estimate.Unit = utils.Ptr(feeUnit)
-		}
 		result = append(result, SimulatedTransaction{
 			TransactionTrace: &traces[i],
 			FeeEstimation:    estimate,
@@ -1551,16 +1439,7 @@ func (h *Handler) TraceBlockTransactions(ctx context.Context, id BlockID) ([]Tra
 		return nil, rpcErr
 	}
 
-	return h.traceBlockTransactions(ctx, block, false)
-}
-
-func (h *Handler) LegacyTraceBlockTransactions(ctx context.Context, id BlockID) ([]TracedBlockTransaction, *jsonrpc.Error) {
-	block, rpcErr := h.blockByID(&id)
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-
-	return h.traceBlockTransactions(ctx, block, true)
+	return h.traceBlockTransactions(ctx, block)
 }
 
 var traceFallbackVersion = semver.MustParse("0.12.3")
@@ -1578,22 +1457,17 @@ func prependBlockHashToState(bc blockchain.Reader, blockNumber uint64, state cor
 	), nil
 }
 
-func (h *Handler) traceBlockTransactions(ctx context.Context, block *core.Block, //nolint: gocyclo
-	legacyJSON bool,
-) ([]TracedBlockTransaction, *jsonrpc.Error) {
+func (h *Handler) traceBlockTransactions(ctx context.Context, block *core.Block) ([]TracedBlockTransaction, *jsonrpc.Error) {
 	isPending := block.Hash == nil
 	if !isPending {
 		if blockVer, err := core.ParseBlockVersion(block.ProtocolVersion); err != nil {
 			return nil, ErrUnexpectedError.CloneWithData(err.Error())
 		} else if blockVer.Compare(traceFallbackVersion) != 1 {
 			// version <= 0.12.2
-			return h.fetchTraces(ctx, block.Hash, legacyJSON)
+			return h.fetchTraces(ctx, block.Hash)
 		}
 
-		if trace, hit := h.blockTraceCache.Get(traceCacheKey{
-			blockHash: *block.Hash,
-			legacy:    legacyJSON,
-		}); hit {
+		if trace, hit := h.blockTraceCache.Get(*block.Hash); hit {
 			return trace, nil
 		}
 	}
@@ -1647,7 +1521,7 @@ func (h *Handler) traceBlockTransactions(ctx context.Context, block *core.Block,
 
 	_, traces, err := h.vm.Execute(block.Transactions, classes, block.Number, block.Header.Timestamp,
 		sequencerAddress, state, network, paidFeesOnL1, false, false, false, block.Header.GasPrice,
-		block.Header.GasPriceSTRK, legacyJSON)
+		block.Header.GasPriceSTRK)
 	if err != nil {
 		if errors.Is(err, utils.ErrResourceBusy) {
 			return nil, ErrInternal.CloneWithData(err.Error())
@@ -1666,16 +1540,13 @@ func (h *Handler) traceBlockTransactions(ctx context.Context, block *core.Block,
 	}
 
 	if !isPending {
-		h.blockTraceCache.Add(traceCacheKey{
-			blockHash: *block.Hash,
-			legacy:    legacyJSON,
-		}, result)
+		h.blockTraceCache.Add(*block.Hash, result)
 	}
 
 	return result, nil
 }
 
-func (h *Handler) fetchTraces(ctx context.Context, blockHash *felt.Felt, legacyTrace bool) ([]TracedBlockTransaction, *jsonrpc.Error) {
+func (h *Handler) fetchTraces(ctx context.Context, blockHash *felt.Felt) ([]TracedBlockTransaction, *jsonrpc.Error) {
 	rpcBlock, err := h.BlockWithTxs(BlockID{
 		Hash: blockHash, // known non-nil
 	})
@@ -1692,7 +1563,7 @@ func (h *Handler) fetchTraces(ctx context.Context, blockHash *felt.Felt, legacyT
 		return nil, ErrUnexpectedError.CloneWithData(fErr.Error())
 	}
 
-	traces, aErr := adaptBlockTrace(rpcBlock, blockTrace, legacyTrace)
+	traces, aErr := adaptBlockTrace(rpcBlock, blockTrace)
 	if aErr != nil {
 		return nil, ErrUnexpectedError.CloneWithData(aErr.Error())
 	}
@@ -1707,11 +1578,11 @@ func (h *Handler) callAndLogErr(f func() error, msg string) {
 }
 
 func (h *Handler) SpecVersion() (string, *jsonrpc.Error) {
-	return "0.6.0", nil
+	return "0.7.0", nil
 }
 
 func (h *Handler) LegacySpecVersion() (string, *jsonrpc.Error) {
-	return "0.5.1", nil
+	return "0.6.0", nil
 }
 
 func (h *Handler) SubscribeNewHeads(ctx context.Context) (uint64, *jsonrpc.Error) {
@@ -1936,7 +1807,7 @@ func (h *Handler) Methods() ([]jsonrpc.Method, string) { //nolint: funlen
 			Params:  []jsonrpc.Parameter{{Name: "id"}},
 			Handler: h.Unsubscribe,
 		},
-	}, "/v0_6"
+	}, "/v0_7"
 }
 
 func (h *Handler) LegacyMethods() ([]jsonrpc.Method, string) { //nolint: funlen
@@ -1956,22 +1827,22 @@ func (h *Handler) LegacyMethods() ([]jsonrpc.Method, string) { //nolint: funlen
 		{
 			Name:    "starknet_getBlockWithTxHashes",
 			Params:  []jsonrpc.Parameter{{Name: "block_id"}},
-			Handler: h.LegacyBlockWithTxHashes,
+			Handler: h.BlockWithTxHashes,
 		},
 		{
 			Name:    "starknet_getBlockWithTxs",
 			Params:  []jsonrpc.Parameter{{Name: "block_id"}},
-			Handler: h.LegacyBlockWithTxs,
+			Handler: h.BlockWithTxs,
 		},
 		{
 			Name:    "starknet_getTransactionByHash",
 			Params:  []jsonrpc.Parameter{{Name: "transaction_hash"}},
-			Handler: h.LegacyTransactionByHash,
+			Handler: h.TransactionByHash,
 		},
 		{
 			Name:    "starknet_getTransactionReceipt",
 			Params:  []jsonrpc.Parameter{{Name: "transaction_hash"}},
-			Handler: h.LegacyTransactionReceiptByHash,
+			Handler: h.TransactionReceiptByHash,
 		},
 		{
 			Name:    "starknet_getBlockTransactionCount",
@@ -1981,7 +1852,7 @@ func (h *Handler) LegacyMethods() ([]jsonrpc.Method, string) { //nolint: funlen
 		{
 			Name:    "starknet_getTransactionByBlockIdAndIndex",
 			Params:  []jsonrpc.Parameter{{Name: "block_id"}, {Name: "index"}},
-			Handler: h.LegacyTransactionByBlockIDAndIndex,
+			Handler: h.TransactionByBlockIDAndIndex,
 		},
 		{
 			Name:    "starknet_getStateUpdate",
@@ -2053,28 +1924,28 @@ func (h *Handler) LegacyMethods() ([]jsonrpc.Method, string) { //nolint: funlen
 		},
 		{
 			Name:    "starknet_estimateFee",
-			Params:  []jsonrpc.Parameter{{Name: "request"}, {Name: "block_id"}},
-			Handler: h.LegacyEstimateFee,
+			Params:  []jsonrpc.Parameter{{Name: "request"}, {Name: "simulation_flags"}, {Name: "block_id"}},
+			Handler: h.EstimateFee,
 		},
 		{
 			Name:    "starknet_estimateMessageFee",
 			Params:  []jsonrpc.Parameter{{Name: "message"}, {Name: "block_id"}},
-			Handler: h.LegacyEstimateMessageFee,
+			Handler: h.EstimateMessageFee,
 		},
 		{
 			Name:    "starknet_traceTransaction",
 			Params:  []jsonrpc.Parameter{{Name: "transaction_hash"}},
-			Handler: h.LegacyTraceTransaction,
+			Handler: h.TraceTransaction,
 		},
 		{
 			Name:    "starknet_simulateTransactions",
 			Params:  []jsonrpc.Parameter{{Name: "block_id"}, {Name: "transactions"}, {Name: "simulation_flags"}},
-			Handler: h.LegacySimulateTransactions,
+			Handler: h.SimulateTransactions,
 		},
 		{
 			Name:    "starknet_traceBlockTransactions",
 			Params:  []jsonrpc.Parameter{{Name: "block_id"}},
-			Handler: h.LegacyTraceBlockTransactions,
+			Handler: h.TraceBlockTransactions,
 		},
 		{
 			Name:    "starknet_specVersion",
@@ -2089,5 +1960,5 @@ func (h *Handler) LegacyMethods() ([]jsonrpc.Method, string) { //nolint: funlen
 			Params:  []jsonrpc.Parameter{{Name: "id"}},
 			Handler: h.Unsubscribe,
 		},
-	}, "/v0_5"
+	}, "/v0_6"
 }

@@ -10,7 +10,7 @@ package vm
 // extern void cairoVMExecute(char* txns_json, char* classes_json, uintptr_t readerHandle, unsigned long long block_number,
 //					unsigned long long block_timestamp, char* chain_id, char* sequencer_address, char* paid_fees_on_l1_json,
 //					unsigned char skip_charge_fee, unsigned char skip_validate, unsigned char err_on_revert, char* gas_price_wei,
-//					char* gas_price_strk, unsigned char legacy_json);
+//					char* gas_price_strk);
 //
 // #cgo vm_debug  LDFLAGS: -L./rust/target/debug   -ljuno_starknet_rs -ldl -lm
 // #cgo !vm_debug LDFLAGS: -L./rust/target/release -ljuno_starknet_rs -ldl -lm
@@ -35,7 +35,7 @@ type VM interface {
 	) ([]*felt.Felt, error)
 	Execute(txns []core.Transaction, declaredClasses []core.Class, blockNumber, blockTimestamp uint64,
 		sequencerAddress *felt.Felt, state core.StateReader, network *utils.Network, paidFeesOnL1 []*felt.Felt,
-		skipChargeFee, skipValidate, errOnRevert bool, gasPriceWEI *felt.Felt, gasPriceSTRK *felt.Felt, legacyTraceJSON bool,
+		skipChargeFee, skipValidate, errOnRevert bool, gasPriceWEI *felt.Felt, gasPriceSTRK *felt.Felt,
 	) ([]*felt.Felt, []TransactionTrace, error)
 }
 
@@ -166,7 +166,7 @@ func (v *vm) Call(contractAddr, classHash, selector *felt.Felt, calldata []felt.
 // Execute executes a given transaction set and returns the gas spent per transaction
 func (v *vm) Execute(txns []core.Transaction, declaredClasses []core.Class, blockNumber, blockTimestamp uint64,
 	sequencerAddress *felt.Felt, state core.StateReader, network *utils.Network, paidFeesOnL1 []*felt.Felt,
-	skipChargeFee, skipValidate, errOnRevert bool, gasPriceWEI *felt.Felt, gasPriceSTRK *felt.Felt, legacyTraceJSON bool,
+	skipChargeFee, skipValidate, errOnRevert bool, gasPriceWEI *felt.Felt, gasPriceSTRK *felt.Felt,
 ) ([]*felt.Felt, []TransactionTrace, error) {
 	context := &callContext{
 		state: state,
@@ -211,10 +211,6 @@ func (v *vm) Execute(txns []core.Transaction, declaredClasses []core.Class, bloc
 	if errOnRevert {
 		errOnRevertByte = 1
 	}
-	var legacyTraceJSONByte byte
-	if legacyTraceJSON {
-		legacyTraceJSONByte = 1
-	}
 
 	chainID := C.CString(network.L2ChainID)
 	C.cairoVMExecute(txnsJSONCstr,
@@ -230,7 +226,6 @@ func (v *vm) Execute(txns []core.Transaction, declaredClasses []core.Class, bloc
 		C.uchar(errOnRevertByte),
 		(*C.char)(unsafe.Pointer(&gasPriceWEIBytes[0])),
 		(*C.char)(unsafe.Pointer(&gasPriceSTRKBytes[0])),
-		C.uchar(legacyTraceJSONByte),
 	)
 
 	C.free(unsafe.Pointer(classesJSONCStr))
