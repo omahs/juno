@@ -144,15 +144,6 @@ impl StateReader for JunoStateReader {
         } else {
             let json_str = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap();
             let contract_class = contract_class_from_json_str(json_str);
-            if let Ok(class) = &contract_class {
-                CLASS_CACHE.lock().unwrap().cache_set(
-                    *class_hash,
-                    CachedContractClass {
-                        definition: class.clone(),
-                        cached_on_height: self.height,
-                    },
-                );
-            }
 
             unsafe { JunoFree(ptr as *const c_void) };
 
