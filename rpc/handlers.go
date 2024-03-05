@@ -1704,7 +1704,6 @@ func (h *Handler) traceBlockTransactions(ctx context.Context, block *core.Block,
 		BlockHashToBeRevealed: blockHashToBeRevealed,
 	}
 
-	// overallFee = gasPrice * gasConsumed +dataGasPrice * dataGasConsumed
 	overallFees, dataGasConsumed, traces, err := h.vm.Execute(block.Transactions, classes, paidFeesOnL1, &blockInfo, state, network, false,
 		false, false)
 	if err != nil {
