@@ -4,16 +4,18 @@ This folder is just being used to gather the necessary components for generating
 
 These PIE files can be sent to the SHARP endpoint for proving. If we want to use the Stone-prover we should also be able to get the neccessary arguments from cairo-run.
 
+This is very much an active work in progress, so the commands etc may not run correctly etc.
+
 ## Requirements
 
-1. Cairo language installed in your system.
+1. cairo installed on your system.
 2. A valid `program_inputs.json` file.
 
 ## Instructions
 
 To run the `os.cairo` program, you need to compile it first. After that, you can use the `cairo-run` command with the appropriate flags.
 
-Here are the steps:
+The steps should be something like this:
 
 1. Compile the `os.cairo` file:
 
