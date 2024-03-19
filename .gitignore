@@ -11,3 +11,5 @@ config/
 
 # pyenv
 .python-version
+
+prover/target
