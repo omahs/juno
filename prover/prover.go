@@ -42,8 +42,9 @@ type BlockInfo struct {
 	BlockHashToBeRevealed *felt.Felt
 }
 
+//go:generate mockgen -destination=../mocks/mock_prover.go -package=mocks github.com/NethermindEth/juno/prover Prover
 type Prover interface {
-	snosRunnerRun(blockInfo *BlockInfo, useBlobData bool, network *utils.Network, state core.StateReader) error // Todo
+	CairoRunnerRun(blockInfo *BlockInfo, useBlobData bool, network *utils.Network, state core.StateReader) error // Todo
 }
 
 type prover struct {
@@ -55,8 +56,8 @@ func New(log utils.SimpleLogger) Prover {
 		log: log,
 	}
 }
-func (p *prover) snosRunnerRun(blockInfo *BlockInfo, useBlobData bool, network *utils.Network, state core.StateReader) error {
-	// Todo: generate relevant data (block data and transactions in json form)
+func (p *prover) CairoRunnerRun(blockInfo *BlockInfo, useBlobData bool, network *utils.Network, state core.StateReader) error {
+	// Todo: generate relevant data (block data and transactions in json form) and pass into snosRunnerRun
 	// Todo: handle the "returned" data
 	context := &callContext{
 		state: state,
