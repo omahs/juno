@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 snos = { git = "https://github.com/keep-starknet-strange/snos.git" }
+starknet_api = "=0.8.0"
 
 [[bin]]
 name = "prover"

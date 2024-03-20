@@ -369,7 +369,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "starknet-crypto 0.5.2",
- "starknet_api",
+ "starknet_api 0.7.0-dev.0",
  "strum",
  "strum_macros",
  "thiserror",
@@ -2550,6 +2550,7 @@ name = "prover"
 version = "0.1.0"
 dependencies = [
  "snos",
+ "starknet_api 0.8.0",
 ]
 
 [[package]]
@@ -3105,7 +3106,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "starknet-crypto 0.6.1",
- "starknet_api",
+ "starknet_api 0.7.0-dev.0",
  "thiserror",
  "tokio",
  "uuid",
@@ -3249,6 +3250,26 @@ dependencies = [
  "once_cell",
  "parity-scale-codec",
  "parity-scale-codec-derive",
+ "primitive-types",
+ "serde",
+ "serde_json",
+ "starknet-crypto 0.5.2",
+ "strum",
+ "strum_macros",
+ "thiserror",
+]
+
+[[package]]
+name = "starknet_api"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8bfc63e01213a3a39af29aa061435b80a24919ac02d1dce758d9e1ac8be2a44"
+dependencies = [
+ "cairo-lang-starknet-classes",
+ "derive_more",
+ "hex",
+ "indexmap 2.2.5",
+ "once_cell",
  "primitive-types",
  "serde",
  "serde_json",
