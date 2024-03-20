@@ -28,6 +28,7 @@ pub struct BlockInfo {
 }
 
 
+// Todo: pass in parameter to lead the relevant program_input.json data (which will be block dependant)
 #[no_mangle]
 pub extern "C" fn snosRunnerRun(
     block_info_ptr: *const BlockInfo,
@@ -46,7 +47,7 @@ pub extern "C" fn snosRunnerRun(
     // SNOS runner
     // Todo: override input path and block context
     let runner = SnOsRunner::default();
-    let runner = runner.with_input_path("new/input/path"); // Todo: pass in the actual json data
+    let runner = runner.with_input_path("../program_input.json"); // Todo: update this file to hold real contract and txn data. 
     let runner = runner.with_block_context(block_context);
 
     // Execute the run method

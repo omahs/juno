@@ -1,0 +1,45 @@
+{
+    "deprecated_compiled_classes": {
+    },
+    "compiled_class_visited_pcs": {},
+    "compiled_classes": {},
+    "contracts": {},
+    "class_hash_to_compiled_class_hash": {},
+    "general_config": {
+      "starknet_os_config": {
+        "chain_id": 1536727068981429685321,
+        "fee_token_address": "0x3400a86fdc294a70fac1cf84f81a2127419359096b846be9814786d4fc056b8",
+        "deprecated_fee_token_address": "0x3400a86fdc294a70fac1cf84f81a2127419359096b846be9814786d4fc056b8"
+      },
+      "gas_price_bounds": {
+        "min_wei_l1_gas_price": 10000000000,
+        "min_fri_l1_gas_price": 100000000000000,
+        "max_fri_l1_gas_price": 10,
+        "min_wei_l1_data_gas_price": 100000000000,
+        "min_fri_l1_data_gas_price": 100000,
+        "max_fri_l1_data_gas_price": 10000000000
+      },
+      "invoke_tx_max_n_steps": 3000000,
+      "validate_max_n_steps": 1000000,
+      "default_eth_price_in_fri": 1000000000000000000000,
+      "constant_gas_price": false,
+      "sequencer_address": "0x6c95526293b61fa708c6cba66fd015afee89309666246952456ab970e9650aa",
+      "cairo_resource_fee_weights": {
+        "n_steps": 1.0,
+        "output_builtin": 0.0,
+        "pedersen_builtin": 0.0,
+        "range_check_builtin": 0.0,
+        "ecdsa_builtin": 0.0,
+        "bitwise_builtin": 0.0,
+        "ec_op_builtin": 0.0,
+        "keccak_builtin": 0.0,
+        "poseidon_builtin": 0.0
+      },
+      "enforce_l1_handler_fee": true,
+      "use_kzg_da": true
+    },
+    "transactions": [],
+    "block_hash": 2535437458273622887584459710067137978693525181086955024571735059458497227738,
+    "contract_state_commitment_info": {},
+    "contract_class_commitment_info": {}
+  }
