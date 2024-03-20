@@ -12,4 +12,4 @@ config/
 # pyenv
 .python-version
 
-prover/target
+prover/rust/target
