@@ -1,10 +1,12 @@
 package pebble
 
 import (
+	"context"
 	"sync"
 	"testing"
 
 	"github.com/NethermindEth/juno/db"
+	"github.com/NethermindEth/juno/utils"
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/vfs"
 )
@@ -110,4 +112,27 @@ func (d *DB) Update(fn func(txn db.Transaction) error) error {
 // Impl : see db.DB.Impl
 func (d *DB) Impl() any {
 	return d.pebble
+}
+
+func CalculatePrefixSize(ctx context.Context, db *DB, prefix []byte) (uint, error) {
+	var (
+		err  error
+		size uint
+	)
+
+	pebbleDB := db.Impl().(*pebble.DB)
+	it := pebbleDB.NewIter(&pebble.IterOptions{LowerBound: prefix, UpperBound: append(prefix, 0xff)})
+
+	for it.First(); it.Valid(); it.Next() {
+		if ctx.Err() != nil {
+			return size, utils.RunAndWrapOnError(it.Close, ctx.Err())
+		}
+		v, err := it.ValueAndErr()
+		if err != nil {
+			return 0, utils.RunAndWrapOnError(it.Close, err)
+		}
+		size += uint(len(it.Key()) + len(v))
+	}
+
+	return size, utils.RunAndWrapOnError(it.Close, err)
 }
