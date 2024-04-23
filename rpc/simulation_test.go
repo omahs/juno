@@ -32,7 +32,7 @@ func TestSimulateTransactionsV0_6(t *testing.T) {
 	}
 	mockReader.EXPECT().HeadsHeader().Return(headsHeader, nil).AnyTimes()
 
-	t.Run("ok with zero values, skip fee", func(t *testing.T) {
+	t.Run("ok with zero values, skip fee", func(t *testing.T) { //nolint:dupl
 		mockVM.EXPECT().Execute(nil, nil, []*felt.Felt{}, &vm.BlockInfo{
 			Header: headsHeader,
 		}, mockState, network, true, false, false, false).
@@ -42,7 +42,7 @@ func TestSimulateTransactionsV0_6(t *testing.T) {
 		require.Nil(t, err)
 	})
 
-	t.Run("ok with zero values, skip validate", func(t *testing.T) {
+	t.Run("ok with zero values, skip validate", func(t *testing.T) { //nolint:dupl
 		mockVM.EXPECT().Execute(nil, nil, []*felt.Felt{}, &vm.BlockInfo{
 			Header: headsHeader,
 		}, mockState, network, false, true, false, false).

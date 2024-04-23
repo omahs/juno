@@ -505,7 +505,7 @@ func TestTransactionReceiptByHashV0_6(t *testing.T) {
 		txHash := new(felt.Felt).SetBytes([]byte("random hash"))
 		mockReader.EXPECT().TransactionByHash(txHash).Return(nil, errors.New("tx not found"))
 
-		tx, rpcErr := handler.TransactionReceiptByHash(*txHash)
+		tx, rpcErr := handler.TransactionReceiptByHashV0_6(*txHash)
 		assert.Nil(t, tx)
 		assert.Equal(t, rpc.ErrTxnHashNotFound, rpcErr)
 	})
@@ -522,7 +522,7 @@ func TestTransactionReceiptByHashV0_6(t *testing.T) {
 		expectedMap := make(map[string]any)
 		require.NoError(t, json.Unmarshal([]byte(expected), &expectedMap))
 
-		receipt, err := handler.TransactionReceiptByHash(*h)
+		receipt, err := handler.TransactionReceiptByHashV0_6(*h)
 		require.Nil(t, err)
 
 		receiptJSON, jsonErr := json.Marshal(receipt)
@@ -752,7 +752,6 @@ func TestTransactionReceiptByHashV0_6(t *testing.T) {
 
 //nolint:dupl
 func TestTransactionReceiptByHash(t *testing.T) {
-	t.Skip()
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
 
@@ -775,20 +774,20 @@ func TestTransactionReceiptByHash(t *testing.T) {
 	block0, err := mainnetGw.BlockByNumber(context.Background(), 0)
 	require.NoError(t, err)
 
-	checkTxReceipt := func(t *testing.T, txHash *felt.Felt, expected string) {
+	checkTxReceipt := func(t *testing.T, h *felt.Felt, expected string) {
 		t.Helper()
 
 		expectedMap := make(map[string]any)
 		require.NoError(t, json.Unmarshal([]byte(expected), &expectedMap))
 
-		receipt, err := handler.TransactionReceiptByHashV0_6(*txHash)
+		receipt, err := handler.TransactionReceiptByHash(*h)
 		require.Nil(t, err)
+
 		receiptJSON, jsonErr := json.Marshal(receipt)
 		require.NoError(t, jsonErr)
 
 		receiptMap := make(map[string]any)
 		require.NoError(t, json.Unmarshal(receiptJSON, &receiptMap))
-
 		assert.Equal(t, expectedMap, receiptMap)
 	}
 
@@ -801,11 +800,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 			expected: `{
 					"type": "DEPLOY",
 					"transaction_hash": "0xe0a2e45a80bb827967e096bcf58874f6c01c191e0a0530624cba66a508ae75",
-					"actual_fee": {
-						"amount": "0x0",
-						"unit": "WEI"
-					},
-					"actual_fee": "0x0",
+					"actual_fee": {"amount": "0x0", "unit": "WEI"},
 					"finality_status": "ACCEPTED_ON_L2",
 					"execution_status": "SUCCEEDED",
 					"block_hash": "0x47c3637b57c2b079b93c61539950c17e868a28f46cdef28f88521067f21e943",
@@ -813,15 +808,15 @@ func TestTransactionReceiptByHash(t *testing.T) {
 					"messages_sent": [],
 					"events": [],
 					"contract_address": "0x20cfa74ee3564b4cd5435cdace0f9c4d43b939620e4a0bb5076105df0a626c6",
-					"execution_resources": {"steps":29}
+					"execution_resources":{"steps":29}
 				}`,
-		}, // todo double check that decimal is ok (before that there was hex)
+		},
 		"without contract addr": {
 			index: 2,
 			expected: `{
 					"type": "INVOKE",
 					"transaction_hash": "0xce54bbc5647e1c1ea4276c01a708523f740db0ff5474c77734f73beec2624",
-					"actual_fee": "0x0",
+					"actual_fee": {"amount": "0x0", "unit": "WEI"},
 					"finality_status": "ACCEPTED_ON_L2",
 					"execution_status": "SUCCEEDED",
 					"block_hash": "0x47c3637b57c2b079b93c61539950c17e868a28f46cdef28f88521067f21e943",
@@ -837,7 +832,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 						}
 					],
 					"events": [],
-					"execution_resources":{"bitwise_builtin_applications":"0x0", "ec_op_builtin_applications":"0x0", "ecdsa_builtin_applications":"0x0", "keccak_builtin_applications":"0x0", "memory_holes":"0x0", "pedersen_builtin_applications":"0x0", "poseidon_builtin_applications":"0x0", "range_check_builtin_applications":"0x0", "steps":"0x1f"}
+					"execution_resources":{"steps":31}
 				}`,
 		},
 	}
@@ -857,7 +852,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 		expected := `{
 					"type": "INVOKE",
 					"transaction_hash": "0xce54bbc5647e1c1ea4276c01a708523f740db0ff5474c77734f73beec2624",
-					"actual_fee": "0x0",
+					"actual_fee": {"amount": "0x0", "unit": "WEI"},
 					"finality_status": "ACCEPTED_ON_L2",
 					"execution_status": "SUCCEEDED",
 					"messages_sent": [
@@ -871,7 +866,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 						}
 					],
 					"events": [],
-					"execution_resources":{"bitwise_builtin_applications":"0x0", "ec_op_builtin_applications":"0x0", "ecdsa_builtin_applications":"0x0", "keccak_builtin_applications":"0x0", "memory_holes":"0x0", "pedersen_builtin_applications":"0x0", "poseidon_builtin_applications":"0x0", "range_check_builtin_applications":"0x0", "steps":"0x1f"}
+					"execution_resources":{"steps":31}
 				}`
 
 		txHash := block0.Transactions[i].Hash()
@@ -886,7 +881,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 		expected := `{
 					"type": "INVOKE",
 					"transaction_hash": "0xce54bbc5647e1c1ea4276c01a708523f740db0ff5474c77734f73beec2624",
-					"actual_fee": "0x0",
+					"actual_fee": {"amount": "0x0", "unit": "WEI"},
 					"finality_status": "ACCEPTED_ON_L1",
 					"execution_status": "SUCCEEDED",
 					"block_hash": "0x47c3637b57c2b079b93c61539950c17e868a28f46cdef28f88521067f21e943",
@@ -902,7 +897,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 						}
 					],
 					"events": [],
-					"execution_resources":{"bitwise_builtin_applications":"0x0", "ec_op_builtin_applications":"0x0", "ecdsa_builtin_applications":"0x0", "keccak_builtin_applications":"0x0", "memory_holes":"0x0", "pedersen_builtin_applications":"0x0", "poseidon_builtin_applications":"0x0", "range_check_builtin_applications":"0x0", "steps":"0x1f"}
+					"execution_resources":{"steps":31}
 				}`
 
 		txHash := block0.Transactions[i].Hash()
@@ -920,7 +915,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 		expected := `{
 			"type": "INVOKE",
 			"transaction_hash": "0x19abec18bbacec23c2eee160c70190a48e4b41dd5ff98ad8f247f9393559998",
-			"actual_fee": "0x247aff6e224",
+			"actual_fee": {"amount": "0x247aff6e224", "unit": "WEI"},
 			"execution_status": "REVERTED",
 			"finality_status": "ACCEPTED_ON_L2",
 			"block_hash": "0x76e0229fd0c36dda2ee7905f7e4c9b3ebb78d98c4bfab550bcb3a03bf859a6",
@@ -928,7 +923,7 @@ func TestTransactionReceiptByHash(t *testing.T) {
 			"messages_sent": [],
 			"events": [],
 			"revert_reason": "Error in the called contract (0x00b1461de04c6a1aa3375bdf9b7723a8779c082ffe21311d683a0b15c078b5dc):\nError at pc=0:25:\nGot an exception while executing a hint.\nCairo traceback (most recent call last):\nUnknown location (pc=0:731)\nUnknown location (pc=0:677)\nUnknown location (pc=0:291)\nUnknown location (pc=0:314)\n\nError in the called contract (0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7):\nError at pc=0:104:\nGot an exception while executing a hint.\nCairo traceback (most recent call last):\nUnknown location (pc=0:1678)\nUnknown location (pc=0:1664)\n\nError in the called contract (0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7):\nError at pc=0:6:\nGot an exception while executing a hint: Assertion failed, 0 % 0x800000000000011000000000000000000000000000000000000000000000001 is equal to 0\nCairo traceback (most recent call last):\nUnknown location (pc=0:1238)\nUnknown location (pc=0:1215)\nUnknown location (pc=0:836)\n",
-			"execution_resources":{"bitwise_builtin_applications":"0x0", "ec_op_builtin_applications":"0x0", "ecdsa_builtin_applications":"0x0", "keccak_builtin_applications":"0x0", "memory_holes":"0x0", "pedersen_builtin_applications":"0x0", "poseidon_builtin_applications":"0x0", "range_check_builtin_applications":"0x0","steps":"0x0"}
+			"execution_resources":{"steps":0}
 		}`
 
 		integClient := feeder.NewTestClient(t, &utils.Integration)
@@ -983,8 +978,15 @@ func TestTransactionReceiptByHash(t *testing.T) {
 					]
 				}
 			],
-			"execution_resources": {"bitwise_builtin_applications":"0x0", "ec_op_builtin_applications":"0x0", "ecdsa_builtin_applications":"0x0", "keccak_builtin_applications":"0x0", "memory_holes":"0x4", "pedersen_builtin_applications":"0x0", "poseidon_builtin_applications":"0x0", "range_check_builtin_applications":"0x13", "steps":"0x267"},
-			"actual_fee": "0x16d8b4ad4000",
+			"execution_resources": {
+				"steps": 615,
+				"range_check_builtin_applications": 19,
+				"memory_holes": 4
+			},
+			"actual_fee": {
+				"amount": "0x16d8b4ad4000",
+				"unit": "FRI"
+			},
 			"type": "INVOKE"
 		}`
 
