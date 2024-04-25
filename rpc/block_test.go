@@ -217,7 +217,7 @@ func TestBlockTransactionCount(t *testing.T) {
 	t.Run("blockID - pending", func(t *testing.T) {
 		latestBlock.Hash = nil
 		latestBlock.GlobalStateRoot = nil
-		mockReader.EXPECT().Pending().Return(blockchain.Pending{
+		mockReader.EXPECT().Pending().Return(&blockchain.Pending{
 			Block: latestBlock,
 		}, nil)
 
@@ -335,7 +335,7 @@ func TestBlockWithTxHashes(t *testing.T) {
 	t.Run("blockID - pending", func(t *testing.T) {
 		latestBlock.Hash = nil
 		latestBlock.GlobalStateRoot = nil
-		mockReader.EXPECT().Pending().Return(blockchain.Pending{
+		mockReader.EXPECT().Pending().Return(&blockchain.Pending{
 			Block: latestBlock,
 		}, nil)
 		mockReader.EXPECT().L1Head().Return(nil, db.ErrKeyNotFound)
@@ -472,7 +472,7 @@ func TestBlockWithTxs(t *testing.T) {
 	t.Run("blockID - pending", func(t *testing.T) {
 		latestBlock.Hash = nil
 		latestBlock.GlobalStateRoot = nil
-		mockReader.EXPECT().Pending().Return(blockchain.Pending{
+		mockReader.EXPECT().Pending().Return(&blockchain.Pending{
 			Block: latestBlock,
 		}, nil).Times(2)
 		mockReader.EXPECT().L1Head().Return(nil, db.ErrKeyNotFound).Times(2)
