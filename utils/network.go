@@ -86,33 +86,6 @@ var (
 			},
 		},
 	}
-	Goerli = Network{
-		Name:       "goerli",
-		FeederURL:  "https://alpha4.starknet.io/feeder_gateway/",
-		GatewayURL: "https://alpha4.starknet.io/gateway/",
-		L2ChainID:  "SN_GOERLI",
-		//nolint:gomnd
-		L1ChainID:           big.NewInt(5),
-		CoreContractAddress: common.HexToAddress("0xde29d060D45901Fb19ED6C6e959EB22d8626708e"),
-		BlockHashMetaInfo: &BlockHashMetaInfo{
-			First07Block:             47028,
-			UnverifiableRange:        []uint64{119802, 148428},
-			FallBackSequencerAddress: fallBackSequencerAddress,
-		},
-	}
-	Goerli2 = Network{
-		Name:       "goerli2",
-		FeederURL:  "https://alpha4-2.starknet.io/feeder_gateway/",
-		GatewayURL: "https://alpha4-2.starknet.io/gateway/",
-		L2ChainID:  "SN_GOERLI2",
-		//nolint:gomnd
-		L1ChainID:           big.NewInt(5),
-		CoreContractAddress: common.HexToAddress("0xa4eD3aD27c294565cB0DCc993BDdCC75432D498c"),
-		BlockHashMetaInfo: &BlockHashMetaInfo{
-			First07Block:             0,
-			FallBackSequencerAddress: fallBackSequencerAddress,
-		},
-	}
 	Integration = Network{
 		Name:       "integration",
 		FeederURL:  "https://external.integration.starknet.io/feeder_gateway/",

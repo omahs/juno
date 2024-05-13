@@ -7,7 +7,7 @@ on:
         description: 'Network'
         required: false
         default: 'mainnet'
-        enum: ['mainnet', 'goerli', 'goerli2']
+        enum: ['mainnet', 'sepolia']
   schedule:
     - cron: '0 22 * * 5'
 

@@ -332,14 +332,14 @@ func TestMessageHash(t *testing.T) {
 }
 
 func TestDeclareV0TransactionHash(t *testing.T) {
-	network := utils.Goerli
+	network := utils.Sepolia
 	gw := adaptfeeder.New(feeder.NewTestClient(t, &network))
 	ctx := context.Background()
 
-	b, err := gw.BlockByNumber(ctx, 231579)
+	b, err := gw.BlockByNumber(ctx, 0)
 	require.NoError(t, err)
 
-	decTx, ok := b.Transactions[30].(*core.DeclareTransaction)
+	decTx, ok := b.Transactions[1].(*core.DeclareTransaction)
 	require.True(t, ok)
 
 	expectedHash := decTx.Hash()
