@@ -82,14 +82,14 @@ func TestV1Call(t *testing.T) {
 	testDB := pebble.NewMemTest(t)
 	txn, err := testDB.NewTransaction(true)
 	require.NoError(t, err)
-	client := feeder.NewTestClient(t, &utils.Sepolia)
+	client := feeder.NewTestClient(t, &utils.Mainnet)
 	gw := adaptfeeder.New(client)
 	t.Cleanup(func() {
 		require.NoError(t, txn.Discard())
 	})
 
 	contractAddr := utils.HexToFelt(t, "0xDEADBEEF")
-	classHash := utils.HexToFelt(t, "0x28d1671fb74ecb54d848d463cefccffaef6df3ae40db52130e19fe8299a7b43")
+	classHash := utils.HexToFelt(t, "0x1338d85d3e579f6944ba06c005238d145920afeb32f94e3a1e234d21e1e9292")
 	simpleClass, err := gw.Class(context.Background(), classHash)
 	require.NoError(t, err)
 
@@ -98,7 +98,7 @@ func TestV1Call(t *testing.T) {
 	testState := core.NewState(txn)
 	require.NoError(t, testState.Update(0, &core.StateUpdate{
 		OldRoot: &felt.Zero,
-		NewRoot: utils.HexToFelt(t, "0xb00a6bfc7d0301d26a570ef4f33ad6b307f8f398066b9aeac793b7ffe93082"),
+		NewRoot: utils.HexToFelt(t, "0x2650cef46c190ec6bb7dc21a5a36781132e7c883b27175e625031149d4f1a84"),
 		StateDiff: &core.StateDiff{
 			DeployedContracts: map[felt.Felt]*felt.Felt{
 				*contractAddr: classHash,

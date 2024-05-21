@@ -176,7 +176,7 @@ func TestTransaction(t *testing.T) {
 }
 
 func TestClassV1(t *testing.T) {
-	client := feeder.NewTestClient(t, &utils.Integration)
+	client := feeder.NewTestClient(t, &utils.Mainnet)
 	adapter := adaptfeeder.New(client)
 
 	tests := []struct {
@@ -184,12 +184,12 @@ func TestClassV1(t *testing.T) {
 		hasCompiledClass bool
 	}{
 		{
-			classHash:        utils.HexToFelt(t, "0x1cd2edfb485241c4403254d550de0a097fa76743cd30696f714a491a454bad5"),
+			classHash:        utils.HexToFelt(t, "0x1338d85d3e579f6944ba06c005238d145920afeb32f94e3a1e234d21e1e9292"),
 			hasCompiledClass: true,
 		},
 		{
-			classHash:        utils.HexToFelt(t, "0x4e70b19333ae94bd958625f7b61ce9eec631653597e68645e13780061b2136c"),
-			hasCompiledClass: false,
+			classHash:        utils.HexToFelt(t, "0x21c2e8a87c431e8d3e89ecd1a40a0674ef533cce5a1f6c44ba9e60d804ecad2"),
+			hasCompiledClass: true,
 		},
 	}
 
@@ -219,15 +219,15 @@ func TestClassV1(t *testing.T) {
 }
 
 func TestStateUpdateWithBlock(t *testing.T) {
-	numbers := []uint64{0, 78541}
+	numbers := []uint64{0, 7320, 19199}
 
-	client := feeder.NewTestClient(t, &utils.Integration)
+	client := feeder.NewTestClient(t, &utils.Mainnet)
 	adapter := adaptfeeder.New(client)
 	ctx := context.Background()
 
 	for _, number := range numbers {
 		numberStr := strconv.FormatUint(number, 10)
-		t.Run("integration block number "+numberStr, func(t *testing.T) {
+		t.Run("block number "+numberStr, func(t *testing.T) {
 			response, err := client.StateUpdateWithBlock(ctx, numberStr)
 			require.NoError(t, err)
 			sig, err := client.Signature(ctx, numberStr)
@@ -245,7 +245,7 @@ func TestStateUpdateWithBlock(t *testing.T) {
 }
 
 func TestStateUpdatePendingWithBlock(t *testing.T) {
-	client := feeder.NewTestClient(t, &utils.Integration)
+	client := feeder.NewTestClient(t, &utils.Mainnet)
 	adapter := adaptfeeder.New(client)
 	ctx := context.Background()
 
