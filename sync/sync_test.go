@@ -165,7 +165,7 @@ func TestReorg(t *testing.T) {
 		// Ensure current head is Integration head
 		head, err := bc.HeadsHeader()
 		require.NoError(t, err)
-		require.Equal(t, utils.HexToFelt(t, "0x7a906dfd1ff77a121b8048e6f750cda9e949d341c4487d4c6a449f183f0e61d"), head.Hash)
+		require.Equal(t, utils.HexToFelt(t, "0x78b67b11f8c23850041e11fb0f3b39db0bcb2c99d756d5a81321d1b483d79f6"), head.Hash)
 
 		synchronizer = sync.New(bc, mainGw, utils.NewNopZapLogger(), time.Duration(0), false)
 		ctx, cancel = context.WithTimeout(context.Background(), timeout)
@@ -175,7 +175,7 @@ func TestReorg(t *testing.T) {
 		// After syncing (and reorging) the current head should be at mainnet
 		head, err = bc.HeadsHeader()
 		require.NoError(t, err)
-		require.NotEqual(t, utils.HexToFelt(t, "0x7a906dfd1ff77a121b8048e6f750cda9e949d341c4487d4c6a449f183f0e61d"), head.Hash)
+		require.NotEqual(t, utils.HexToFelt(t, "0x78b67b11f8c23850041e11fb0f3b39db0bcb2c99d756d5a81321d1b483d79f6"), head.Hash)
 		require.Equal(t, utils.HexToFelt(t, "0x4e1f77f39545afe866ac151ac908bd1a347a2a8a7d58bef1276db4f06fdf2f6"), head.Hash)
 	})
 }
