@@ -38,6 +38,11 @@ type Client struct {
 	listener   EventListener
 }
 
+type StarknetFeederError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 func (c *Client) WithListener(l EventListener) *Client {
 	c.listener = l
 	return c
@@ -253,6 +258,14 @@ func (c *Client) get(ctx context.Context, queryURL string) (io.ReadCloser, error
 				c.listener.OnResponse(req.URL.Path, res.StatusCode, time.Since(reqTimer))
 				if res.StatusCode == http.StatusOK {
 					return res.Body, nil
+				} else if res.StatusCode == http.StatusBadRequest {
+					var starknetFeederError StarknetFeederError
+					if decodeErr := json.NewDecoder(res.Body).Decode(&starknetFeederError); decodeErr != nil {
+						return nil, decodeErr
+					}
+					c.log.Warnw("Bad request", "Starknet error code", (starknetFeederError.Code))
+					err = errors.New(starknetFeederError.Code)
+					return nil, err
 				} else {
 					err = errors.New(res.Status)
 				}
