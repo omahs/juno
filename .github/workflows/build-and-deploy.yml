@@ -62,16 +62,25 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: Development
-    steps:
+    steps:    
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: "juno,argo"
 
       - name: Repository Dispatch Dev
         env:
           EVENT_NAME: juno-dev
           IMAGE_TAG: ${{ needs.docker_build_and_publish.outputs.IMAGE_TAG }}
           SEPOLIA: apps/juno-dev/overlays/dev-sepolia/config.yaml
-          APP_TOKEN: ${{ needs.docker_build_and_publish.outputs.APP_TOKEN }}
+          APP_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           curl -L \
           -X POST \
