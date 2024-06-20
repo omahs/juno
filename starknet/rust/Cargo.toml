@@ -9,6 +9,14 @@ edition = "2021"
 serde = "1.0.171"
 serde_json = { version = "1.0.96", features = ["raw_value"] }
 cairo-lang-starknet-classes = "=2.6.0"
+cairo-lang-casm = "=2.6.0"
+cairo-lang-sierra-type-size = "=2.6.0"
+cairo-lang-sierra-ap-change = "=2.6.0"
+cairo-lang-eq-solver = "=2.6.0"
+cairo-lang-sierra-gas = "=2.6.0"
+cairo-lang-utils = "=2.6.0"
+cairo-lang-sierra-to-casm = "=2.6.0"
+cairo-lang-sierra = "=2.6.0"
 
 [lib]
 crate-type = ["staticlib"]
