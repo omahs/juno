@@ -190,7 +190,7 @@ After following these steps, Juno should be up and running on your machine, util
   - `starknet_addInvokeTransaction`
   - `starknet_addDeclareTransaction`
   - `starknet_addDeployAccountTransaction`
-  - `starkent_estimateMessageFee`
+  - `starknet_estimateMessageFee`
   - `starknet_traceTransaction`
   - `starknet_traceBlockTransactions`
   - `starknet_simulateTransactions`
